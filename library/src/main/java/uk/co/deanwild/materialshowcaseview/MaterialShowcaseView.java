@@ -992,6 +992,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
                 } else {
                     attached = getWindowToken() != null;
                 }
+                if (attached && mTarget != null) {
+                    setTarget(mTarget);
+                }
                 if (mShouldAnimate && attached) {
                     fadeIn();
                 } else {
