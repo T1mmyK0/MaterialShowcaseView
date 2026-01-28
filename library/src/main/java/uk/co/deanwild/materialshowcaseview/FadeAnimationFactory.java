@@ -25,6 +25,10 @@ public class FadeAnimationFactory implements IAnimationFactory{
 
     @Override
     public void animateInView(View target, Point point, long duration, final AnimationStartListener listener) {
+        if (!isAttachedToWindow(target)) {
+            listener.onAnimationStart();
+            return;
+        }
         ObjectAnimator oa = ObjectAnimator.ofFloat(target, ALPHA, INVISIBLE, VISIBLE);
         oa.setDuration(duration).addListener(new Animator.AnimatorListener() {
             @Override
@@ -49,6 +53,10 @@ public class FadeAnimationFactory implements IAnimationFactory{
 
     @Override
     public void animateOutView(View target, Point point, long duration, final AnimationEndListener listener) {
+        if (!isAttachedToWindow(target)) {
+            listener.onAnimationEnd();
+            return;
+        }
         ObjectAnimator oa = ObjectAnimator.ofFloat(target, ALPHA, INVISIBLE);
         oa.setDuration(duration).addListener(new Animator.AnimatorListener() {
             @Override
@@ -69,6 +77,13 @@ public class FadeAnimationFactory implements IAnimationFactory{
             }
         });
         oa.start();
+    }
+
+    private boolean isAttachedToWindow(View target) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            return target.isAttachedToWindow();
+        }
+        return target.getWindowToken() != null;
     }
 
     @Override

@@ -26,6 +26,10 @@ public class CircularRevealAnimationFactory implements IAnimationFactory {
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     @Override
     public void animateInView(View target, Point point, long duration, final AnimationStartListener listener) {
+        if (!isAttachedToWindow(target)) {
+            listener.onAnimationStart();
+            return;
+        }
         Animator animator = ViewAnimationUtils.createCircularReveal(target, point.x, point.y, 0,
                 target.getWidth() > target.getHeight() ? target.getWidth() : target.getHeight());
         animator.setDuration(duration).addListener(new Animator.AnimatorListener() {
@@ -56,6 +60,10 @@ public class CircularRevealAnimationFactory implements IAnimationFactory {
     @TargetApi(Build.VERSION_CODES.LOLLIPOP)
     @Override
     public void animateOutView(View target, Point point, long duration, final AnimationEndListener listener) {
+        if (!isAttachedToWindow(target)) {
+            listener.onAnimationEnd();
+            return;
+        }
         Animator animator = ViewAnimationUtils.createCircularReveal(target, point.x, point.y,
                 target.getWidth() > target.getHeight() ? target.getWidth() : target.getHeight(), 0);
         animator.setDuration(duration).addListener(new Animator.AnimatorListener() {
@@ -81,6 +89,13 @@ public class CircularRevealAnimationFactory implements IAnimationFactory {
         });
 
         animator.start();
+    }
+
+    private boolean isAttachedToWindow(View target) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+            return target.isAttachedToWindow();
+        }
+        return target.getWindowToken() != null;
     }
 
     @Override
