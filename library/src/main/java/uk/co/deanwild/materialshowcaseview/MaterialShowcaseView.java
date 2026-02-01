@@ -1054,6 +1054,11 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
     public void animateOut() {
 
+        if (mAnimationFactory == null || mTarget == null) {
+            removeFromWindow();
+            return;
+        }
+
         mAnimationFactory.animateOutView(this, mTarget.getPoint(), mFadeDurationInMillis, new IAnimationFactory.AnimationEndListener() {
             @Override
             public void onAnimationEnd() {
