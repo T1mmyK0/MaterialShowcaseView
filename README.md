@@ -70,14 +70,14 @@ The source project uses the following stable versions, checked on October 5, 202
 | Android Studio | Rabbit 1 / 2026.2.1 |
 | Android Gradle Plugin | 9.4.1 |
 | Gradle | 9.8.0 |
-| Android compile SDK | Android 17, API 37.2 |
+| Android compile SDK | Android 17, API 37 |
 | Sample target SDK | API 37 |
 | Android SDK Build Tools | 37.0.0 |
 | Java source and bytecode | 17 |
 | AndroidX AppCompat / Core | 1.8.0 / 1.19.1 |
 | Material Components | 1.14.0 |
 
-Install SDK Platform 37.2 and Build Tools 37.0.0 through Android Studio's SDK
+Install SDK Platform 37 and Build Tools 37.0.0 through Android Studio's SDK
 Manager. Set the SDK location in `local.properties` (`sdk.dir=...`) or through
 `ANDROID_HOME`. Use JDK 17 or a compatible newer JDK; builds have been verified
 with Android Studio's bundled JDK 25.
@@ -106,7 +106,7 @@ edge-to-edge layouts. Normal lint checks are enabled, including target SDK check
 
 Android libraries specify a compile SDK; the consuming application controls the
 target SDK and Android runtime behavior. Consumers of this source build need the
-37.2 compile SDK. The sample opts into API 37 behavior. The JitPack 1.3.7 dependency
+37 compile SDK. The sample opts into API 37 behavior. The JitPack 1.3.7 dependency
 shown above is the previously published release; these source changes require a
 new release or using the local `:library` module.
 

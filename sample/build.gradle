@@ -6,11 +6,7 @@ android {
     testOptions { unitTests.includeAndroidResources = true }
     enableKotlin = false
     namespace = 'uk.co.deanwild.materialshowcaseviewsample'
-    compileSdk {
-        version = release(37) {
-            minorApiLevel = 2
-        }
-    }
+    compileSdk = 37
     buildToolsVersion = '37.0.0'
 
     defaultConfig {
