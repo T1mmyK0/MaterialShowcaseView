@@ -34,6 +34,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
     private ViewTreeObserver.OnPreDrawListener customContentChanges;
     private final Path mask = new Path();
     private final Path highlightPath = new Path();
+    private final Path revealClip = new Path();
     private final Region primaryHighlight = new Region(), viewportRegion = new Region();
     private final RectF hole = new RectF();
     private final RectF highlightBounds = new RectF(), extraHole = new RectF();
@@ -46,6 +47,8 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
     private final View previousFocus;
     private final View previousAccessibilityFocus;
     private Animator animator;
+    private float revealRadius = -1;
+    private int revealX, revealY;
     private boolean closed, exiting, tap, panelGesture, detaching;
     private View gestureTarget;
     private final Rect gestureBounds = new Rect();
@@ -349,7 +352,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
             customContentTree.addOnPreDrawListener(customContentChanges);
         }
         reveal = () -> callbacks.run(() -> {
-            if (closed) return;
+            if (closed || exiting) return;
             repositionNow(); if (closed) return;
             setVisibility(VISIBLE);
             if (step.interaction != Step.Interaction.HINT && panel.getVisibility() == VISIBLE) panel.requestFocus();
@@ -359,7 +362,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
                 announceForAccessibility(hasText(step.title) && hasText(step.text)
                         ? step.title + ". " + step.text : hasText(step.title) ? step.title : step.text);
             // Actual shown means attached and visible at entrance start, including zero duration.
-            animateAlpha(0, 1, null); shown.run();
+            animateVisibility(true, null); shown.run();
         });
         post(reveal);
     }
@@ -526,6 +529,13 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         callbacks.run(() -> super.onLayout(changed, left, top, right, bottom));
     }
     @Override protected void onSizeChanged(int w, int h, int oldw, int oldh) { reposition(); }
+    @Override public void draw(Canvas canvas) {
+        int saved = canvas.save();
+        try {
+            if (revealRadius >= 0) canvas.clipPath(revealClip);
+            super.draw(canvas);
+        } finally { canvas.restoreToCount(saved); }
+    }
     @Override protected void onDraw(Canvas canvas) {
         callbacks.run(() -> {
             if (closed || step.interaction == Step.Interaction.HINT) return;
@@ -627,17 +637,72 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         });
         return true;
     }
-    private void animateAlpha(float from, float to, Runnable complete) {
+    private void animateVisibility(boolean entering, Runnable complete) {
         if (closed) return;
-        if (animator != null) { animator.removeAllListeners(); animator.cancel(); }
+        // Reverse the radius actually used for drawing, including before the first frame.
+        boolean reverseReveal = !entering && revealRadius >= 0 && animator != null && animator.isStarted();
+        float currentRadius = reverseReveal ? revealRadius : 0;
+        cancelAnimation();
+        float to = entering ? 1 : 0;
         long duration = theme.reducedMotion || (Build.VERSION.SDK_INT >= 26 && !ValueAnimator.areAnimatorsEnabled()) ? 0 : theme.animationMillis;
         if (duration <= 0) { setAlpha(to); if (complete != null) complete.run(); return; }
-        animator = ObjectAnimator.ofFloat(this, "alpha", from, to); animator.setDuration(duration);
+        Rect bounds = new Rect();
+        if (theme.animationStyle == TutorialTheme.AnimationStyle.CIRCULAR_REVEAL && isAttachedToWindow()
+                && revealBounds(bounds)) {
+            if (!reverseReveal) { revealX = bounds.centerX(); revealY = bounds.centerY(); }
+            float radius = (float) Math.hypot(Math.max(revealX, getWidth() - revealX),
+                    Math.max(revealY, getHeight() - revealY));
+            float start = entering ? 0 : reverseReveal ? currentRadius : radius;
+            float end = entering ? radius : 0;
+            setAlpha(1);
+            // One animator drives both rendering and reversal. A separate native reveal
+            // can run ahead on the render thread and clear a replacement clip after cancellation.
+            setRevealRadius(start);
+            ValueAnimator animation = ValueAnimator.ofFloat(start, end);
+            animation.addUpdateListener(frame -> callbacks.run(() -> {
+                if (!closed && animator == frame) setRevealRadius((Float) frame.getAnimatedValue());
+            }));
+            animator = animation;
+        } else {
+            // If the target disappeared mid-reveal, fade only what is already visible.
+            if (reverseReveal) setRevealRadius(currentRadius);
+            animator = ObjectAnimator.ofFloat(this, "alpha", entering ? 0 : getAlpha(), to);
+        }
+        animator.setDuration(duration);
         animator.addListener(new AnimatorListenerAdapter() {
-            @Override public void onAnimationEnd(Animator animation) { callbacks.run(() -> { if (!closed && complete != null) complete.run(); }); }
+            @Override public void onAnimationEnd(Animator animation) {
+                callbacks.run(() -> {
+                    if (closed || animator != animation) return;
+                    animator = null; setAlpha(to); setRevealRadius(-1);
+                    if (complete != null) complete.run();
+                });
+            }
         }); animator.start();
     }
-    Cancellation hide(Runnable hidden) { exiting = true; tap = false; gestureTarget = null; animateAlpha(getAlpha(), 0, hidden); return () -> { if (animator != null) { animator.removeAllListeners(); animator.cancel(); } }; }
+    private void setRevealRadius(float radius) {
+        revealRadius = radius; revealClip.rewind();
+        if (radius >= 0) revealClip.addCircle(revealX, revealY, radius, Path.Direction.CW);
+        invalidate();
+    }
+    private boolean revealBounds(Rect bounds) {
+        View primary = target.get();
+        if (primary == null || !primary.isShown() || primary.getAlpha() <= 0
+                || !TargetGeometry.visibleOnScreen(primary, bounds)) return false;
+        Rect usable = new Rect();
+        if (!TargetGeometry.usableOnScreen(root, usable) || !bounds.intersect(usable)) return false;
+        getLocationOnScreen(origin); bounds.offset(-origin[0], -origin[1]);
+        return bounds.intersect(0, 0, getWidth(), getHeight());
+    }
+    private void cancelAnimation() {
+        Animator previous = animator; animator = null;
+        if (previous != null) { previous.removeAllListeners(); previous.cancel(); }
+        setRevealRadius(-1);
+    }
+    Cancellation hide(Runnable hidden) {
+        exiting = true; tap = false; gestureTarget = null; animateVisibility(false, hidden);
+        Animator exit = animator;
+        return () -> { if (animator == exit) cancelAnimation(); };
+    }
     @Override protected void onDetachedFromWindow() {
         detaching = true;
         try {

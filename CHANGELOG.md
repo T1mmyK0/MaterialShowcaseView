@@ -1,3 +1,12 @@
+# 1.8.2 — optional circular reveal
+
+- Added opt-in `TutorialTheme.AnimationStyle.CIRCULAR_REVEAL` for session entrances and exits,
+  centered on the visible primary target. Fade remains the default and the fallback for targetless
+  steps. The existing `animationMillis` option controls each transition's duration.
+- Preserve the current reveal radius when an exit interrupts an entrance. Both animation styles
+  respect reduced motion, disabled system animations and cancellation without committing stale exits.
+  If the target disappears during entrance, the fade fallback preserves the visible circle.
+
 # 1.8.1 — tutorial panel placement
 
 - Measure the full-width panel's desired height before choosing a placement. Explanations that

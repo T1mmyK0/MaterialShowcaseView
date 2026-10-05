@@ -15,6 +15,10 @@ public final class TutorialTheme {
     /** ARGB label color for primary pills. Null selects a contrasting color. */
     public Integer primaryButtonTextColor;
     public float textSizeSp = 18, paddingDp = 16, cornerDp = 12;
+    public enum AnimationStyle { FADE, CIRCULAR_REVEAL }
+    /** Circular reveal uses the visible primary target's center; without a target it fades. */
+    public AnimationStyle animationStyle = AnimationStyle.FADE;
+    /** Duration of each entrance and exit in milliseconds. Zero or negative disables transitions. */
     public long animationMillis = 180;
     // The default footer is Skip + Next. Additional navigation is explicitly opt-in.
     public boolean reducedMotion, showPrevious, showNext = true, showSkipStep, showSkipTour = true, showClose;
@@ -35,7 +39,7 @@ public final class TutorialTheme {
         maskColor=other.maskColor; surfaceColor=other.surfaceColor; textColor=other.textColor;
         primaryButtonColor=other.primaryButtonColor; primaryButtonTextColor=other.primaryButtonTextColor;
         textSizeSp=other.textSizeSp; paddingDp=other.paddingDp; cornerDp=other.cornerDp;
-        animationMillis=other.animationMillis; reducedMotion=other.reducedMotion;
+        animationStyle=other.animationStyle; animationMillis=other.animationMillis; reducedMotion=other.reducedMotion;
         showPrevious=other.showPrevious; showNext=other.showNext; showSkipStep=other.showSkipStep;
         showSkipTour=other.showSkipTour; showClose=other.showClose;
         previous=other.previous; next=other.next; skipStep=other.skipStep; skipTour=other.skipTour; close=other.close;

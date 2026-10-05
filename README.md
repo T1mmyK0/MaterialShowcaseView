@@ -6,10 +6,11 @@ New integrations should use `Tutorial`, `Step`, `TutorialSession` and `AndroidTu
 The current fork release is available from JitPack:
 
 ```groovy
-implementation 'com.github.T1mmyK0:MaterialShowcaseView:1.8.1'
+implementation 'com.github.T1mmyK0:MaterialShowcaseView:1.8.2'
 ```
 
-Version 1.8.1 fixes session panel placement around highlighted controls. See the
+Version 1.8.2 adds optional circular reveal transitions with configurable duration to the
+session API and includes the panel placement fixes from 1.8.1. See the
 [release notes](CHANGELOG.md) for details.
 
 - [Session API and contracts](docs/SESSION_API.md)
@@ -62,12 +63,12 @@ Then add the dependency to your module's build.gradle:
 
 /app/build.gradle
 ```groovy
-implementation 'com.github.deano2390:MaterialShowcaseView:1.3.7'
+implementation 'com.github.T1mmyK0:MaterialShowcaseView:1.8.2'
 ```
 
 NOTE: Some people have mentioned that they needed to add the @aar suffix to get it to resolve from JitPack:
 ```groovy
-implementation 'com.github.deano2390:MaterialShowcaseView:1.3.7@aar'
+implementation 'com.github.T1mmyK0:MaterialShowcaseView:1.8.2@aar'
 ```
 
 # Building from source
@@ -115,9 +116,8 @@ edge-to-edge layouts. Normal lint checks are enabled, including target SDK check
 
 Android libraries specify a compile SDK; the consuming application controls the
 target SDK and Android runtime behavior. Consumers of this source build need the
-37 compile SDK. The sample opts into API 37 behavior. The JitPack 1.3.7 dependency
-shown above is the previously published release; these source changes require a
-new release or using the local `:library` module.
+37 compile SDK. The sample opts into API 37 behavior. The current JitPack dependency
+shown above includes these changes; the local `:library` module can also be used.
 
 # How to use
 --------
@@ -203,8 +203,8 @@ Publishing libraries to Maven is a chore that takes time and effort. Jitpack.io 
 [1]: https://github.com/amlcurran/ShowcaseView
 [2]: http://i.imgur.com/rFHENgz.gif
 [3]: https://code.google.com/p/android-flowtextview/
-[4]: https://img.shields.io/github/release/deano2390/MaterialShowcaseView.svg?label=JitPack
-[5]: https://jitpack.io/#deano2390/MaterialShowcaseView
+[4]: https://img.shields.io/github/release/T1mmyK0/MaterialShowcaseView.svg?label=JitPack
+[5]: https://jitpack.io/#T1mmyK0/MaterialShowcaseView
 [6]: https://medium.com/@yashgirdhar/android-material-showcase-view-part-1-22abd5c65b85
 [7]: https://1bucketlist.blogspot.com/2017/03/android-material-showcase-view-1.html
 [8]: https://blog.fossasia.org/tag/material-showcase-view/

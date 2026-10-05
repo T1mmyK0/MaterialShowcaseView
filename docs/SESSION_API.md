@@ -327,6 +327,25 @@ host.setTheme(theme); // Apply before showing the tutorial.
 Title/content/button text appearance resources are supported. Use resource-selected colors for light/dark styling. `reducedMotion` disables transitions; system
 animation disabling is respected through
 [ValueAnimator.areAnimatorsEnabled](https://developer.android.com/reference/android/animation/ValueAnimator#areAnimatorsEnabled()).
+
+Set `animationStyle` to `TutorialTheme.AnimationStyle.CIRCULAR_REVEAL` to expand the overlay
+from the visible primary target's center and collapse it on exit. `FADE` remains the default.
+Targetless steps, or steps whose target is no longer visible at exit, use a fade fallback.
+The reveal covers the entire overlay, and an exit that interrupts its entrance starts from
+the current radius. If the target disappears during entrance, the fade fallback preserves
+the visible circle instead of revealing clipped content. Both styles use `animationMillis`
+for **each** entrance and exit
+(default 180 ms); zero or negative values disable transitions. Reduced motion and system
+animation disabling also apply to both styles. Apply the theme before starting the session;
+each presentation receives its own copy.
+
+```java
+TutorialTheme theme = new TutorialTheme();
+theme.animationStyle = TutorialTheme.AnimationStyle.CIRCULAR_REVEAL;
+theme.animationMillis = 300; // 300 ms to enter, 300 ms to exit.
+host.setTheme(theme);
+```
+
 `contentFactory` creates a fresh custom View for each presentation; navigation remains library-owned.
 
 Branches return stable step IDs. Missing destinations, self-loops and revisiting a traversed branch

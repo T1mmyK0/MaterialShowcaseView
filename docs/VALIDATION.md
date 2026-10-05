@@ -1,5 +1,25 @@
 # Validation and release limits
 
+## Session circular reveal — 2026-10-06
+
+`TutorialAnimationTest` adds 35 regression executions across APIs 24, 28 and 30. Tests
+advance the frame clock explicitly to verify configured entrance/exit durations, target-local
+reveal coordinates, full-overlay radius, theme copying, partial-entrance reversal, cancellation,
+targetless/hidden-target fade fallback, reduced motion and disabled system animations.
+Session coverage verifies that progress commits only after exit and that disposal cancels a
+pending commit. Pending entrances also cannot redisplay or announce an exiting overlay.
+API 30 native-graphics tests also assert rendered circle boundaries, continuity during
+reversal, rejection of stale animation frames, coverage of every overlay corner and canvas
+clip restoration. Rendered frames are saved under `library/build/reports/tutorial-animation/`.
+A disappearing-target regression reproduced a full-overlay flash before the fade fallback
+was fixed to preserve its current clip (`build/tutorial-animation-target-lost-before.log`).
+The focused run is recorded in `build/tutorial-animation-review-focused.log`; no physical-device
+animation capture was performed for this change.
+
+Full validation passed: **588 tests, 0 failed, 0 skipped** (534 core, 16 lifecycle and 38
+sample). Lint reports 0 errors and the same 34 existing warnings. Both release AARs and the
+sample debug APK build successfully. The complete log is `build/tutorial-animation-review-validation.log`.
+
 ## Tutorial panel placement — 2026-10-06
 
 `TutorialPlacementTest` adds 24 regression executions on APIs 24, 28 and 30. The fixtures
