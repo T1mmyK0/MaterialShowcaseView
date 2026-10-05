@@ -82,6 +82,11 @@ Manager. Set the SDK location in `local.properties` (`sdk.dir=...`) or through
 `ANDROID_HOME`. Use JDK 17 or a compatible newer JDK; builds have been verified
 with Android Studio's bundled JDK 25.
 
+JitPack selects JDK 17 through `jitpack.yml`. The Gradle daemon uses the configured
+Gradle JDK or `JAVA_HOME`; there is no repository-wide daemon JVM override, so CI
+does not download Android Studio's JetBrains runtime. The core library already
+defines a Maven publication, which JitPack builds with `publishToMavenLocal`.
+
 In Android Studio, select the bundled JDK as the Gradle JDK and sync the project.
 For command-line builds, set `JAVA_HOME` to your JDK directory and run:
 
