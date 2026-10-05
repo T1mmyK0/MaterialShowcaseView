@@ -406,21 +406,26 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
             if (!extraHole.isEmpty()) { appendHole(extraHole, false); highlightBounds.union(extraHole); }
         }
         if (panel.getVisibility() == GONE) { updateTargetTapControl(); invalidate(); return; }
-        int above = highlightBounds.isEmpty() ? 0 : Math.max(0, (int) highlightBounds.top - viewport.top);
+        int above = highlightBounds.isEmpty() ? 0 : Math.max(0, (int) Math.floor(highlightBounds.top) - viewport.top);
         int below = highlightBounds.isEmpty() ? viewport.height() : Math.max(0, viewport.bottom - (int) Math.ceil(highlightBounds.bottom));
         int left = highlightBounds.isEmpty() ? 0 : Math.max(0, (int) highlightBounds.left - viewport.left);
         int right = highlightBounds.isEmpty() ? 0 : Math.max(0, viewport.right - (int) Math.ceil(highlightBounds.right));
-        boolean beside = Math.max(left, right) >= dp(240) && Math.max(above, below) < viewport.height() / 2;
+        // Measure the desired height before limiting it to any candidate region. A
+        // scroll-clipped measurement would make content appear to fit on either side.
+        panel.measure(MeasureSpec.makeMeasureSpec(Math.max(0, viewport.width()), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+        int desiredHeight = panel.getMeasuredHeight();
+        boolean fitsAbove = desiredHeight <= above, fitsBelow = desiredHeight <= below;
+        boolean beside = !fitsAbove && !fitsBelow && Math.max(left, right) >= dp(240);
         int cardWidth = beside ? Math.max(left, right) : viewport.width();
+        // The larger vertical region also selects the only fitting region, if any.
         boolean top = above > below;
         int space = beside ? viewport.height() : Math.max(above, below);
-        int minimumSpace = Math.min(dp(144), viewport.height());
+        int minimumSpace = Math.min(desiredHeight, Math.min(dp(144), viewport.height()));
         if (!beside && highlightBounds.height() > viewport.height() / 2f) {
             // A fixed minimum can still leave Next below the fold. Reserve enough for
             // short explanations, or half the viewport for content that needs scrolling.
-            panel.measure(MeasureSpec.makeMeasureSpec(Math.max(0, cardWidth), MeasureSpec.EXACTLY),
-                    MeasureSpec.makeMeasureSpec(viewport.height(), MeasureSpec.AT_MOST));
-            minimumSpace = Math.min(panel.getMeasuredHeight(), Math.max(minimumSpace, viewport.height() / 2));
+            minimumSpace = Math.min(desiredHeight, Math.max(minimumSpace, viewport.height() / 2));
         }
         // A large hole must not remove the scrim behind the explanation and its controls.
         // Suppress it for this geometry update, then recover it normally if the target shrinks.
@@ -450,11 +455,12 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         LayoutParams lp = (LayoutParams) panel.getLayoutParams();
         int height = Math.min(space, panel.getMeasuredHeight());
         int y = top ? viewport.top : viewport.bottom - height;
-        if (!beside && !highlightBounds.isEmpty()) {
-            // Match the legacy showcase: keep its explanation next to the highlighted control.
-            y = top ? (int) Math.floor(highlightBounds.top) - height : (int) Math.ceil(highlightBounds.bottom);
-            y = Math.max(viewport.top, Math.min(y, viewport.bottom - height));
+        if (!highlightBounds.isEmpty()) {
+            // Keep the panel adjacent vertically, or centered alongside the highlight.
+            y = beside ? Math.round(highlightBounds.centerY() - height / 2f)
+                    : top ? (int) Math.floor(highlightBounds.top) - height : (int) Math.ceil(highlightBounds.bottom);
         }
+        y = Math.max(viewport.top, Math.min(y, viewport.bottom - height));
         int x = beside && right > left ? viewport.right - cardWidth : viewport.left;
         if (lp.width != cardWidth || lp.height != height || lp.topMargin != y || lp.leftMargin != x) {
             lp.gravity = Gravity.TOP | Gravity.LEFT; lp.width = Math.max(0, cardWidth); lp.height = height;

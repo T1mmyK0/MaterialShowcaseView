@@ -3,6 +3,15 @@
 New integrations should use `Tutorial`, `Step`, `TutorialSession` and `AndroidTutorialHost` from
 `uk.co.deanwild.materialshowcaseview.session`. Existing builders remain available.
 
+The current fork release is available from JitPack:
+
+```groovy
+implementation 'com.github.T1mmyK0:MaterialShowcaseView:1.8.1'
+```
+
+Version 1.8.1 fixes session panel placement around highlighted controls. See the
+[release notes](CHANGELOG.md) for details.
+
 - [Session API and contracts](docs/SESSION_API.md)
 - [Java AI tutorial integration and migration](docs/AI_TUTORIAL_MIGRATION.md)
 - [Source audit and compatibility decisions](docs/AUDIT.md)

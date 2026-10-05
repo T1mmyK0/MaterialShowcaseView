@@ -1,4 +1,16 @@
-# Unreleased — lifecycle-aware onboarding
+# 1.8.1 — tutorial panel placement
+
+- Measure the full-width panel's desired height before choosing a placement. Explanations that
+  fit above or below a highlight now sit directly against its edge, with spacing supplied by
+  the panel's padding.
+- Use a side column only when neither vertical region fits, remeasure at the column width,
+  and center the panel vertically on the highlight while keeping it inside the usable viewport.
+- Preserve scrollable content, reachable navigation, targetless placement and oversized-target
+  fallbacks, including the uncovered target area required by `TARGET_TAP`.
+- Add density-aware placement regressions for portrait, landscape, RTL, large fonts, scrolling,
+  rotation, insets and offset windows, plus native Android screenshot rendering.
+
+# 1.8.0 — lifecycle-aware onboarding
 
 - Fixed lifecycle binding creation when a resume callback destroys the owner or throws:
   disposed bindings no longer crash during initialization, and failed constructors release

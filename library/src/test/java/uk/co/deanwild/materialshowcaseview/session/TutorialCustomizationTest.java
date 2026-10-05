@@ -40,8 +40,10 @@ public class TutorialCustomizationTest {
     @After public void cleanup() { host.cancel(); controller.pause().stop().destroy(); }
     void layout() {
         View decor = activity.getWindow().getDecorView();
-        decor.measure(View.MeasureSpec.makeMeasureSpec(400, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(640, View.MeasureSpec.EXACTLY));
-        decor.layout(0, 0, 400, 640);
+        android.util.DisplayMetrics metrics = activity.getResources().getDisplayMetrics();
+        decor.measure(View.MeasureSpec.makeMeasureSpec(metrics.widthPixels, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(metrics.heightPixels, View.MeasureSpec.EXACTLY));
+        decor.layout(0, 0, metrics.widthPixels, metrics.heightPixels);
     }
     void settle() {
         for (int i = 0; i < 8; i++) {

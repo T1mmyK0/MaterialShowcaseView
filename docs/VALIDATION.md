@@ -1,5 +1,28 @@
 # Validation and release limits
 
+## Tutorial panel placement — 2026-10-06
+
+`TutorialPlacementTest` adds 24 regression executions on APIs 24, 28 and 30. The fixtures
+measure portrait windows at 1440 × 3120 pixels and landscape windows at 3120 × 1440 pixels,
+with 560 dpi resources. `TutorialCustomizationTest` now sizes its decor from display metrics.
+Coverage includes full-width content fit, exact panel-edge adjacency, side-column remeasurement
+and centering, midpoint movement, viewport boundaries, RTL, enlarged fonts, scrollable navigation,
+targetless fallback, rotation, scrolling, changing insets and non-zero window origins.
+
+The finalized regressions fail 14 executions against the original placement code and pass with
+the fix. Before/after logs are `build/placement-before.log` and `build/placement-after.log`.
+API 30 native-graphics tests render six screenshots under
+`library/build/reports/tutorial-placement/`. Visual inspection covers portrait/landscape in
+both layout directions, a centered side panel and enlarged text scrolled to its navigation
+button. Pixel assertions also check that the target remains visible through the highlight.
+These are Robolectric renders; this change has not been validated on a physical device.
+
+Full release validation passed with `--offline --rerun-tasks`: **553 tests, 0 failed,
+0 skipped** (499 core, 16 lifecycle and 38 sample), including the existing oversized-target
+and `TARGET_TAP` regressions. Lint reports 0 errors and the same 34 existing warnings.
+The sample debug APK and both release AARs build successfully; all 207 Gradle tasks executed.
+The complete log is `build/placement-release-validation.log`.
+
 ## Lifecycle binding follow-up — 2026-10-05
 
 Two constructor regressions were reproduced and repaired:
