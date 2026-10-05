@@ -27,7 +27,6 @@ import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
-import java.util.Arrays;
 import uk.co.deanwild.materialshowcaseview.target.ViewTarget;
 
 /**
@@ -483,8 +482,7 @@ public class ShowcaseTooltip {
                     setPadding(paddingLeft + arrowHeight, paddingTop, paddingRight, paddingBottom);
                     break;
             }
-            bubblePath = drawBubble(new RectF(0, 0, getWidth(), getHeight()), corner, corner, corner, corner);
-            postInvalidate();
+            updateBubblePath();
         }
 
         public void setAlign(ALIGN align) {
@@ -529,7 +527,7 @@ public class ShowcaseTooltip {
 
         public void setArrowWidth(int arrowWidth) {
             this.arrowWidth = arrowWidth;
-            postInvalidate();
+            updateBubblePath();
         }
 
         public int getArrowSourceMargin() {
@@ -538,7 +536,7 @@ public class ShowcaseTooltip {
 
         public void setArrowSourceMargin(int arrowSourceMargin) {
             this.arrowSourceMargin = arrowSourceMargin;
-            postInvalidate();
+            updateBubblePath();
         }
 
         public int getArrowTargetMargin() {
@@ -547,7 +545,7 @@ public class ShowcaseTooltip {
 
         public void setArrowTargetMargin(int arrowTargetMargin) {
             this.arrowTargetMargin = arrowTargetMargin;
-            postInvalidate();
+            updateBubblePath();
         }
 
         public void setTextTypeFace(Typeface textTypeFace) {
@@ -573,6 +571,12 @@ public class ShowcaseTooltip {
 
         public void setCorner(int corner) {
             this.corner = corner;
+            updateBubblePath();
+        }
+
+        private void updateBubblePath() {
+            bubblePath = drawBubble(new RectF(0, 0, getWidth(), getHeight()), corner, corner, corner, corner);
+            postInvalidate();
         }
 
         @Override
@@ -701,29 +705,27 @@ public class ShowcaseTooltip {
             bottomLeftDiameter = bottomLeftDiameter < 0 ? 0 : bottomLeftDiameter;
             bottomRightDiameter = bottomRightDiameter < 0 ? 0 : bottomRightDiameter;
 
-            float spacingLeft = 30;
+            final boolean vertical = position == Position.TOP || position == Position.BOTTOM;
+            final float spacingLeft = this.position == Position.RIGHT ? arrowHeight : 30;
             final float spacingTop = this.position == Position.BOTTOM ? arrowHeight : 0;
-            float spacingRight = 30;
+            final float spacingRight = this.position == Position.LEFT ? arrowHeight : 30;
             final float spacingBottom = this.position == Position.TOP ? arrowHeight : 0;
 
             final float left = spacingLeft + myRect.left;
             final float top = spacingTop + myRect.top;
             final float right = myRect.right - spacingRight;
             final float bottom = myRect.bottom - spacingBottom;
-            final float centerX = viewRect.centerX() - getX();
+            final float centerX = viewRect.exactCenterX() - getX();
+            final float centerY = viewRect.exactCenterY() - getY();
 
-            final float arrowSourceX = (Arrays.asList(Position.TOP, Position.BOTTOM).contains(this.position))
+            final float arrowSourceX = vertical
                     ? centerX + arrowSourceMargin
                     : centerX;
-            final float arrowTargetX = (Arrays.asList(Position.TOP, Position.BOTTOM).contains(this.position))
+            final float arrowTargetX = vertical
                     ? centerX + arrowTargetMargin
                     : centerX;
-            final float arrowSourceY = (Arrays.asList(Position.RIGHT, Position.LEFT).contains(this.position))
-                    ? bottom / 2f - arrowSourceMargin
-                    : bottom / 2f;
-            final float arrowTargetY = (Arrays.asList(Position.RIGHT, Position.LEFT).contains(this.position))
-                    ? bottom / 2f - arrowTargetMargin
-                    : bottom / 2f;
+            final float arrowSourceY = centerY - (vertical ? 0 : arrowSourceMargin);
+            final float arrowTargetY = centerY - (vertical ? 0 : arrowTargetMargin);
 
             path.moveTo(left + topLeftDiameter / 2f, top);
             //LEFT, TOP

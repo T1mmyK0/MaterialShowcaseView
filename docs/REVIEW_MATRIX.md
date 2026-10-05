@@ -29,7 +29,7 @@ The subsequent API 24 baseline cleanup expanded the suite to 400 passing tests; 
 | L4 | Android attachment and lifecycle | External removal during entrance/show/exit on APIs 28/30; real window teardown; existing focus, lifecycle, Back and RecyclerView regressions | Pass after fixes; device limits below |
 | P1 | Input and progress | Existing session, Android and sample suites: cancelled/moving/obsolete gestures, scoped actions, Previous/Next, branch history, CAS/reset/replay and policy acceptance | Pass |
 | V1 | Legacy and session content | `LayoutContractMatrixTest`: 3 window sizes × 2 directions × 2 font scales × 2 renderers × 2 APIs; scroll to and click the final control | Pass: 48 configurations |
-| V2 | Tooltip geometry and reuse | 4 placements × 3 alignments × 2 directions × 2 font scales × 2 APIs; natural-width recovery; live direction changes; existing edge/clipping/inset/motion/reuse tests | Pass: 96 placement configurations plus focused regressions |
+| V2 | Tooltip geometry and reuse | 4 placements × 3 alignments × 2 directions × 2 font scales × 2 APIs; natural-width recovery; live direction changes; existing edge/clipping/inset/motion/reuse tests; `TooltipDrawingTest` checks side-arrow anchors/depth and live arrow/corner changes on APIs 24/28/30 | Pass: 96 original placement configurations plus focused regressions; 15 drawing checks added in the follow-up |
 | I1 | Build and integration | Full three-module tests/lint, sample debug APK and both release AARs; API 24 sample interactions | Pass; see device evidence |
 
 ## Ownership and callback audit

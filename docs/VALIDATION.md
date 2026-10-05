@@ -5,9 +5,10 @@ installed JetBrains JDK 25 and Android SDK 37.2. Android framework tests use Rob
 APIs 24, 28 and 30; deterministic engine tests use a virtual clock and deliberately stale callbacks.
 The core, lifecycle adapter and sample now all require API 24.
 
-Final result: **400 tests passed, 0 failed, 0 skipped** (352 core, 12 lifecycle/Back/RecyclerView
+Final result: **415 tests passed, 0 failed, 0 skipped** (367 core, 12 lifecycle/Back/RecyclerView
 and 36 sample startup/policy-dialog tests). This includes 95 deterministic session tests and
-147 added API 24 executions of existing Android regression tests. Lint reports **0 errors** across all modules:
+147 added API 24 executions of existing Android regression tests, plus 15 tooltip drawing checks.
+Lint reports **0 errors** across all modules:
 1 core dependency-version warning, 2 lifecycle dependency-version warnings, and 31 sample warnings.
 The sample APK and both release AARs build successfully. Gradle also reports deprecations for
 future Gradle 10, and Robolectric/Conscrypt emits a JDK native-access warning; neither failed checks.
@@ -16,15 +17,36 @@ The completed [structured review matrix](REVIEW_MATRIX.md) records the ownership
 8-phase cancellation matrix, content/tooltip layouts, confirmed repairs and unverified device cells.
 The layout matrix now covers 216 configurations across APIs 24/28/30. The earlier structured review
 added 55 test cases to the previous 198; the API 24 expansion brings the suite from 253 to 400.
-The latest build log is `build/min-sdk24-validation.log`; `build/structured-final.log` and the dated
-review sections below preserve earlier evidence.
+The subsequent tooltip drawing review brings the suite to 415. Its full tests/lint/APK/AAR run
+used `--offline --rerun-tasks`: all 207 Gradle tasks executed successfully. The latest build log
+is `build/review-20261005-final.log`; `build/min-sdk24-validation.log`, `build/structured-final.log`
+and the dated review sections below preserve earlier evidence.
+
+The tooltip review corrected three rendering mechanisms:
+
+- Left/right arrows now point toward the target center for START, CENTER and END alignment.
+- Left/right arrow depth now follows the configured `arrowHeight` instead of a fixed 30 pixels.
+- Changing arrow width, source/target margins or corner size rebuilds the displayed bubble path.
+
+`TooltipDrawingTest` adds five tests on each of APIs 24/28/30. The first four tests all failed
+against the original implementation (`build/review-20261005-drawing-before.log`); the fifth
+covers the related live corner update. The focused drawing/layout/presentation run passed in
+`build/review-20261005-drawing-after.log` before the full run.
+
+The freshly built APK was installed on the API 24 emulator. Both tooltip sequence bubbles
+were inspected visually; lifecycle Next advanced to step 2, Previous returned to step 1, and
+Back cancelled the session after dismissing the keyboard. The AndroidRuntime/AiTutorial error
+log was empty (`build/review-20261005-runtime.log`). Screenshots are
+`build/review-20261005-tooltip.png`, `build/review-20261005-tooltip-second.png` and
+`build/review-20261005-session.png`. This smoke run does not extend the existing modern-device,
+predictive-Back or accessibility-service coverage limits.
 
 The expanded tests retain the existing API 28/30 coverage, with modern inset tests on API 30.
 The tooltip width-recovery fixture uses content with a fixed intrinsic size so differences in
 simulated text metrics do not determine whether it is constrained. The outside-dialog test sends
 a complete DOWN/UP gesture to exercise dismissal on both API 24 and API 30. All module merged
-manifests declare minSdk 24. No new emulator/device run was performed for this SDK cleanup;
-the device observations below are from the earlier review.
+manifests declare minSdk 24. No new emulator/device run was performed for that SDK cleanup;
+the subsequent smoke run is described above, and the device observations below are historical.
 
 Reproduce:
 
