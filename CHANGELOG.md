@@ -1,5 +1,8 @@
 # Unreleased — lifecycle-aware onboarding
 
+- Fixed lifecycle binding creation when a resume callback destroys the owner or throws:
+  disposed bindings no longer crash during initialization, and failed constructors release
+  their lifecycle observer, session and host.
 - Prevented reentrant target activations from invoking app actions more than once. Target gestures
   now respect the actual custom highlight shape; custom path resets/fill rules preserve other highlights.
 - Added `Step.Interaction.TARGET_TAP` for continuation only from the primary highlighted target,

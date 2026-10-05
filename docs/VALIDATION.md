@@ -1,5 +1,29 @@
 # Validation and release limits
 
+## Lifecycle binding follow-up — 2026-10-05
+
+Two constructor regressions were reproduced and repaired:
+
+- A resume callback may destroy the lifecycle owner during synchronous observer registration.
+  The binding now returns safely after disposal instead of dereferencing its cleared lifecycle.
+- A throwing resume callback can abort construction before the caller receives the binding.
+  Failed construction now unregisters the observer and disposes the session/host while preserving
+  the original exception.
+
+`LifecycleTutorialTest` covers both cases on APIs 24 and 28, including observer removal,
+coordinator release and rejection of further work on the disposed session. Before-fix evidence
+is in `build/remaining-bugs-lifecycle-before.log` and `build/remaining-bugs-binding-before.log`;
+the focused fixed suite is in `build/remaining-bugs-lifecycle-after.log`.
+
+Full validation passed with `--offline --rerun-tasks`: **529 tests, 0 failed, 0 skipped**
+(475 core, 16 lifecycle and 38 sample). Lint reports 0 errors and the same 34 existing warnings.
+The sample debug APK and both release AARs build successfully; all 207 Gradle tasks executed.
+The log is `build/remaining-bugs-final.log`. This follow-up adds four test executions to the
+525-test suite following the overlay/target-tap changes. No new device or accessibility-service
+checks were performed; the device coverage limits below still apply.
+
+## Earlier validation
+
 Validation performed on 2026-10-05 using the repository's Gradle 9.8.0 / AGP 9.4.1 setup,
 installed JetBrains JDK 25 and Android SDK 37.2. Android framework tests use Robolectric 4.17,
 APIs 24, 28 and 30; deterministic engine tests use a virtual clock and deliberately stale callbacks.

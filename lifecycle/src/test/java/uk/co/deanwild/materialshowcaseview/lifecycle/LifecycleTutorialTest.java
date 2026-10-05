@@ -76,6 +76,30 @@ public class LifecycleTutorialTest {
         owner.state(Lifecycle.State.DESTROYED);assertEquals(0,coordinator.pendingCount());assertEquals(TutorialSession.State.CANCELLED,session.getState());
         try{session.start();fail();}catch(IllegalStateException expected){}
     }
+    @Test public void ownerCanBeDestroyedWhileBindingResumesAnExistingSession() {
+        session.start(); assertEquals(TutorialSession.State.PAUSED, session.getState());
+        owner.state(Lifecycle.State.RESUMED);
+        session.addListener(event -> {
+            if (event.kind == TutorialSession.Kind.RESUMED) owner.state(Lifecycle.State.DESTROYED);
+        });
+        LifecycleTutorial binding = new LifecycleTutorial(owner, host, session);
+        assertEquals(TutorialSession.State.CANCELLED, session.getState());
+        assertEquals(0, coordinator.pendingCount()); assertFalse(host.ready());
+        assertEquals(0, owner.lifecycle.getObserverCount());
+        binding.cancel();
+        settle(); assertEquals(TutorialSession.State.CANCELLED, session.getState());
+    }
+    @Test public void failedBindingReleasesItsObserverAndHost() {
+        session.start(); owner.state(Lifecycle.State.RESUMED);
+        IllegalStateException failure = new IllegalStateException("resume listener");
+        session.addListener(event -> { if (event.kind == TutorialSession.Kind.RESUMED) throw failure; });
+        try { new LifecycleTutorial(owner, host, session); fail("Expected resume failure"); }
+        catch (IllegalStateException expected) { assertSame(failure, expected); }
+        assertEquals(0, owner.lifecycle.getObserverCount());
+        assertEquals(0, coordinator.pendingCount()); assertFalse(host.ready());
+        try { session.start(); fail("Failed binding retained its session"); }
+        catch (IllegalStateException expected) { assertEquals("Session disposed", expected.getMessage()); }
+    }
     @Test public void predictiveCancelDoesNotCommitButBackDoes(){
         OnBackPressedDispatcher dispatcher=new OnBackPressedDispatcher();new LifecycleTutorial(owner,host,session).interceptBack(dispatcher,owner);owner.state(Lifecycle.State.RESUMED);session.start();settle();
         assertTrue(dispatcher.hasEnabledCallbacks());dispatcher.dispatchOnBackStarted(new BackEventCompat(0,0,0,BackEventCompat.EDGE_LEFT));dispatcher.dispatchOnBackCancelled();assertEquals(TutorialSession.State.SHOWING,session.getState());

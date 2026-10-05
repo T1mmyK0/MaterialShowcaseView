@@ -14,9 +14,19 @@ public final class LifecycleTutorial implements LifecycleEventObserver, Cancella
     public LifecycleTutorial(LifecycleOwner owner, AndroidTutorialHost host, TutorialSession session) {
         new MainThreadScheduler().checkThread();
         this.lifecycle = owner.getLifecycle(); this.host = host; this.session = session;
-        lifecycle.addObserver(this);
-        if (lifecycle.getCurrentState() == Lifecycle.State.DESTROYED) cancel();
-        else host.setResumed(lifecycle.getCurrentState().isAtLeast(Lifecycle.State.RESUMED));
+        try {
+            lifecycle.addObserver(this);
+            // Registration synchronously dispatches existing lifecycle events. Resuming
+            // the session may destroy its owner and dispose this binding before it returns.
+            if (lifecycle == null) return;
+            if (lifecycle.getCurrentState() == Lifecycle.State.DESTROYED) cancel();
+            else host.setResumed(lifecycle.getCurrentState().isAtLeast(Lifecycle.State.RESUMED));
+        } catch (RuntimeException error) {
+            // A failed constructor cannot return a cancellation handle to its caller.
+            try { cancel(); }
+            catch (RuntimeException cleanup) { if (cleanup != error) error.addSuppressed(cleanup); }
+            throw error;
+        }
     }
     public LifecycleTutorial interceptBack(OnBackPressedDispatcher dispatcher, LifecycleOwner owner) {
         if (session == null) throw new IllegalStateException("Disposed binding");
