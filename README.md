@@ -18,13 +18,15 @@ Since Google introduced the Material design philosophy I have seen quite a few a
 
 [![jitpack][4]][5]
 
-Add the jitpack repo to your your project's build.gradle at the end of repositories [Why?](#why-jitpack)
+For the published release, add the JitPack repository to your project's
+`settings.gradle` repositories. [Why?](#why-jitpack)
 
-/build.gradle
+/settings.gradle
 ```groovy
-allprojects {
+dependencyResolutionManagement {
 	repositories {
-		jcenter()
+		google()
+		mavenCentral()
 		maven { url "https://jitpack.io" }
 	}
 }
@@ -34,13 +36,55 @@ Then add the dependency to your module's build.gradle:
 
 /app/build.gradle
 ```groovy
-compile 'com.github.deano2390:MaterialShowcaseView:1.3.7'
+implementation 'com.github.deano2390:MaterialShowcaseView:1.3.7'
 ```
 
 NOTE: Some people have mentioned that they needed to add the @aar suffix to get it to resolve from JitPack:
 ```groovy
-compile 'com.github.deano2390:MaterialShowcaseView:1.3.7@aar'
+implementation 'com.github.deano2390:MaterialShowcaseView:1.3.7@aar'
 ```
+
+# Building from source
+
+The source project uses the following stable versions, checked on October 5, 2026:
+
+| Component | Version |
+| --- | --- |
+| Android Studio | Rabbit 1 / 2026.2.1 |
+| Android Gradle Plugin | 9.4.1 |
+| Gradle | 9.8.0 |
+| Android compile SDK | Android 17, API 37.2 |
+| Sample target SDK | API 37 |
+| Android SDK Build Tools | 37.0.0 |
+| Java source and bytecode | 17 |
+| AndroidX AppCompat / Core | 1.8.0 / 1.19.1 |
+| Material Components | 1.14.0 |
+
+Install SDK Platform 37.2 and Build Tools 37.0.0 through Android Studio's SDK
+Manager. Set the SDK location in `local.properties` (`sdk.dir=...`) or through
+`ANDROID_HOME`. Use JDK 17 or a compatible newer JDK; builds have been verified
+with Android Studio's bundled JDK 25.
+
+In Android Studio, select the bundled JDK as the Gradle JDK and sync the project.
+For command-line builds, set `JAVA_HOME` to your JDK directory and run:
+
+```sh
+./gradlew clean build
+```
+
+On Windows, use `gradlew.bat clean build`. The library AARs are generated in
+`library/build/outputs/aar/`, and sample APKs in `sample/build/outputs/apk/`.
+
+The library remains free of external runtime dependencies and retains its API 12
+minimum. The sample requires Android 6.0 (API 23) or newer, uses AndroidX and
+Material Components, and handles system-bar and display-cutout insets for
+edge-to-edge layouts. Normal lint checks are enabled, including target SDK checks.
+
+Android libraries specify a compile SDK; the consuming application controls the
+target SDK and Android runtime behavior. Consumers of this source build need the
+37.2 compile SDK. The sample opts into API 37 behavior. The JitPack 1.3.7 dependency
+shown above is the previously published release; these source changes require a
+new release or using the local `:library` module.
 
 # How to use
 --------

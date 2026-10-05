@@ -1,7 +1,7 @@
 package uk.co.deanwild.materialshowcaseviewsample;
 
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -10,7 +10,7 @@ import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
 import uk.co.deanwild.materialshowcaseview.shape.OvalShape;
 
 
-public class SimpleSingleExample extends AppCompatActivity implements View.OnClickListener {
+public class SimpleSingleExample extends SampleActivity implements View.OnClickListener {
 
     private Button mButtonShow;
     private Button mButtonReset;

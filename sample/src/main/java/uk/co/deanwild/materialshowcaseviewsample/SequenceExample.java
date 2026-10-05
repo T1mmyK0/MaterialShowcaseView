@@ -1,7 +1,7 @@
 package uk.co.deanwild.materialshowcaseviewsample;
 
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+
 import android.view.View;
 import android.widget.Button;
 import android.widget.Toast;
@@ -11,7 +11,7 @@ import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
 import uk.co.deanwild.materialshowcaseview.ShowcaseConfig;
 
 
-public class SequenceExample extends AppCompatActivity implements View.OnClickListener {
+public class SequenceExample extends SampleActivity implements View.OnClickListener {
 
     private Button mButtonOne;
     private Button mButtonTwo;

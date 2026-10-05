@@ -1,24 +1,37 @@
-apply plugin: 'com.android.library'
-apply plugin: 'maven-publish'
-
-
-android {
-    compileSdkVersion 28
-
-    defaultConfig {
-        minSdkVersion 12
-        targetSdkVersion 28
-    }
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-        }
-    }
+plugins {
+    id 'com.android.library'
+    id 'maven-publish'
 }
 
-dependencies {
-    implementation fileTree(dir: 'libs', include: ['*.jar'])
+android {
+    enableKotlin = false
+    namespace = 'uk.co.deanwild.materialshowcaseview'
+    compileSdk {
+        version = release(37) {
+            minorApiLevel = 2
+        }
+    }
+    buildToolsVersion = '37.0.0'
+
+    defaultConfig {
+        minSdk = 12
+    }
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled = false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
+
+    publishing {
+        singleVariant('release')
+    }
 }
 
 afterEvaluate {

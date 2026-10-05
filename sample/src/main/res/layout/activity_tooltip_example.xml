@@ -6,7 +6,7 @@
     tools:context="uk.co.deanwild.materialshowcaseviewsample.CustomExample">
 
 
-    <android.support.v7.widget.Toolbar
+    <androidx.appcompat.widget.Toolbar
         android:id="@+id/toolbar"
         android:background="#00c2eb"
         android:layout_width="match_parent"
@@ -20,12 +20,13 @@
             android:id="@+id/btn_show"
             android:layout_width="100dp"
             android:layout_height="wrap_content"
-            android:layout_gravity="right"
+            android:layout_gravity="end"
             android:layout_margin="5dp"
             android:backgroundTint="@android:color/white"
+            android:textColor="@android:color/black"
             android:text="Show" />
 
-    </android.support.v7.widget.Toolbar>
+    </androidx.appcompat.widget.Toolbar>
 
 
 
@@ -37,10 +38,11 @@
         android:text="Reset" />
 
 
-    <android.support.design.widget.FloatingActionButton
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/fab"
+        android:contentDescription="@string/edit"
         android:layout_alignParentBottom="true"
-        android:layout_alignParentRight="true"
+        android:layout_alignParentEnd="true"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="end|bottom"

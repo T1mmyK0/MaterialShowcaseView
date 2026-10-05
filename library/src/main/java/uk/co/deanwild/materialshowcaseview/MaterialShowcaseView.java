@@ -14,6 +14,7 @@ import android.graphics.Rect;
 import android.graphics.Typeface;
 import android.os.Build;
 import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.util.AttributeSet;
 import android.view.Gravity;
@@ -22,6 +23,7 @@ import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver;
+import android.view.WindowInsets;
 import android.widget.FrameLayout;
 import android.widget.TextView;
 
@@ -80,6 +82,8 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     private Handler mHandler;
     private long mDelayInMillis = DEFAULT_DELAY;
     private int mBottomMargin = 0;
+    private final Rect mSystemBarInsets = new Rect();
+    private int mNavigationBarBottomInset;
     private boolean mSingleUse = false; // should display only once
     private PrefsManager mPrefsManager; // used to store state doe single use mode
     List<IShowcaseListener> mListeners; // external listeners who want to observe when we show and dismiss
@@ -304,19 +308,13 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
         if (mTarget != null) {
 
-            /**
-             * If we're on lollipop then make sure we don't draw over the nav bar
-             */
-            if (!mRenderOverNav && Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-
-
-                mBottomMargin = getSoftButtonsBarSizePort();
-
-
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                mBottomMargin = mRenderOverNav ? 0 : getSoftButtonsBarSizePort();
                 FrameLayout.LayoutParams contentLP = (LayoutParams) getLayoutParams();
-
-                if (contentLP != null && contentLP.bottomMargin != mBottomMargin)
+                if (contentLP != null && contentLP.bottomMargin != mBottomMargin) {
                     contentLP.bottomMargin = mBottomMargin;
+                    setLayoutParams(contentLP);
+                }
             }
 
             // apply the target position
@@ -361,13 +359,23 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
             boolean layoutParamsChanged = false;
 
-            if (contentLP.bottomMargin != mContentBottomMargin) {
-                contentLP.bottomMargin = mContentBottomMargin;
+            int safeBottomMargin = Math.max(mContentBottomMargin,
+                    Math.max(0, mSystemBarInsets.bottom - mBottomMargin));
+            int safeTopMargin = Math.max(mContentTopMargin, mSystemBarInsets.top);
+            if (contentLP.bottomMargin != safeBottomMargin) {
+                contentLP.bottomMargin = safeBottomMargin;
                 layoutParamsChanged = true;
             }
 
-            if (contentLP.topMargin != mContentTopMargin) {
-                contentLP.topMargin = mContentTopMargin;
+            if (contentLP.topMargin != safeTopMargin) {
+                contentLP.topMargin = safeTopMargin;
+                layoutParamsChanged = true;
+            }
+
+            if (contentLP.leftMargin != mSystemBarInsets.left
+                    || contentLP.rightMargin != mSystemBarInsets.right) {
+                contentLP.leftMargin = mSystemBarInsets.left;
+                contentLP.rightMargin = mSystemBarInsets.right;
                 layoutParamsChanged = true;
             }
 
@@ -421,6 +429,25 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     void setPosition(int x, int y) {
         mXPosition = x;
         mYPosition = y;
+    }
+
+    // ObjectAnimator uses these properties to animate the showcase position.
+    public int getShowcaseX() {
+        return mXPosition;
+    }
+
+    public void setShowcaseX(int x) {
+        mXPosition = x;
+        invalidate();
+    }
+
+    public int getShowcaseY() {
+        return mYPosition;
+    }
+
+    public void setShowcaseY(int y) {
+        mYPosition = y;
+        invalidate();
     }
 
     private void setTitleText(CharSequence contentText) {
@@ -932,7 +959,11 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         mCanvas = null;
         mHandler = null;
 
-        getViewTreeObserver().removeGlobalOnLayoutListener(mLayoutListener);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
+            getViewTreeObserver().removeOnGlobalLayoutListener(mLayoutListener);
+        } else {
+            getViewTreeObserver().removeGlobalOnLayoutListener(mLayoutListener);
+        }
         mLayoutListener = null;
 
         if (mPrefsManager != null)
@@ -964,6 +995,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         }
 
         ((ViewGroup) activity.getWindow().getDecorView()).addView(this);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+            requestApplyInsets();
+        }
 
         setShouldRender(true);
 
@@ -981,7 +1015,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         }
 
 
-        mHandler = new Handler();
+        mHandler = new Handler(Looper.getMainLooper());
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
@@ -1092,15 +1126,40 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
 
-    public int getSoftButtonsBarSizePort() {
-
-        int resourceId = getResources().getIdentifier("navigation_bar_height", "dimen", "android");
-        if (resourceId > 0) {
-            return getResources().getDimensionPixelSize(resourceId);
+    @TargetApi(Build.VERSION_CODES.KITKAT_WATCH)
+    @Override
+    public WindowInsets onApplyWindowInsets(WindowInsets insets) {
+        updateSystemBarInsets(insets);
+        if (mTarget != null) {
+            setTarget(mTarget);
+        } else {
+            applyLayoutParams();
         }
+        return insets;
+    }
 
-        return 0;
+    @TargetApi(Build.VERSION_CODES.KITKAT_WATCH)
+    private void updateSystemBarInsets(WindowInsets insets) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            android.graphics.Insets bars = insets.getInsets(
+                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+            mSystemBarInsets.set(bars.left, bars.top, bars.right, bars.bottom);
+            mNavigationBarBottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
+        } else {
+            mSystemBarInsets.set(insets.getSystemWindowInsetLeft(), insets.getSystemWindowInsetTop(),
+                    insets.getSystemWindowInsetRight(), insets.getSystemWindowInsetBottom());
+            mNavigationBarBottomInset = insets.getSystemWindowInsetBottom();
+        }
+    }
 
+    public int getSoftButtonsBarSizePort() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            WindowInsets insets = getRootWindowInsets();
+            if (insets != null) {
+                updateSystemBarInsets(insets);
+            }
+        }
+        return mNavigationBarBottomInset;
     }
 
     private void setRenderOverNavigationBar(boolean mRenderOverNav) {
