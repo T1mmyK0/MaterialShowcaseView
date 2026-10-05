@@ -13,7 +13,7 @@ import org.robolectric.annotation.Config;
 import java.time.Duration;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class PresentationRegressionTest {
     private ActivityController<Activity> controller;
     private Activity activity;

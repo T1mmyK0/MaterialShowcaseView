@@ -12,7 +12,7 @@ import org.robolectric.android.controller.ActivityController;
 import java.time.Duration;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class AndroidHostTest {
     ActivityController<Activity> controller; Activity activity; FrameLayout root; Button target;
     TutorialHost.Actions actions = new TutorialHost.Actions() {

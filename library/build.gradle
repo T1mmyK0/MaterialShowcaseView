@@ -15,7 +15,7 @@ android {
     buildToolsVersion = '37.0.0'
 
     defaultConfig {
-        minSdk = 12
+        minSdk = 24
     }
 
     compileOptions {

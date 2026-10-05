@@ -2,6 +2,8 @@
 
 Review date: 2026-10-05. This review covers the core library and optional lifecycle adapter,
 including the uncommitted repairs from the preceding review. The sample is an integration fixture.
+The subsequent API 24 baseline cleanup expanded the suite to 400 passing tests; see
+[current validation](VALIDATION.md). The findings below preserve the earlier review's counts.
 
 ## Completion criteria
 
@@ -54,12 +56,12 @@ Framework simulation and device evidence are separate; one does not substitute f
 
 | Surface | Variants | Evidence / status |
 | --- | --- | --- |
-| Robolectric framework | Cached APIs 28 and 30; 320×480, 480×320 and 240×320 content windows; LTR/RTL; font scales 1 and 2 | Pass; 144 combined content/tooltip configurations, plus live geometry checks |
+| Robolectric framework | APIs 24, 28 and 30; 320×480, 480×320 and 240×320 content windows; LTR/RTL; font scales 1 and 2 | Pass; 216 combined content/tooltip configurations, plus live geometry checks |
 | Usable viewport | API 30 bars/cutout/keyboard; padded/clipped parents; narrow windows; transformed/oversized targets | Pass in framework tests (`ModernGeometryTest`, `AndroidRegressionTest`, `AndroidHostTest`) |
 | API 24 emulator | Portrait/landscape, RTL applied through Developer options, enlarged text, sample navigation and cancellation | Pass: legacy scroll/dismiss, both tooltips, lifecycle Next/Previous/Back, rotation; final runtime error log empty |
 | Modern Android device | Edge-to-edge/IME and Android 13+ predictive Back | Unverified: only an API 24 system image is installed; Back adapter tests simulate dispatcher events |
 | Accessibility service | TalkBack and switch access on a device | Unverified: services not installed; focus/property restoration and standard controls are tested |
-| Minimum core API 12 | Runtime behavior on API 12 | Unverified: no matching runtime image |
+| Minimum supported API 24 | Core, lifecycle adapter and sample | See the current [API 24 validation](VALIDATION.md); API 12–23 are no longer supported |
 
 Split-screen device testing, heap profiling, every locale/font/device combination, and arbitrary
 oversized custom tooltip content are outside this run. Tooltip placement tests use anchors with

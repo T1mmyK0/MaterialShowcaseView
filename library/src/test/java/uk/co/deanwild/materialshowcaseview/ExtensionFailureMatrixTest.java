@@ -14,7 +14,7 @@ import java.time.Duration;
 import static org.junit.Assert.*;
 
 /** L3: every framework callback into supplied tooltip content uses the same cleanup contract. */
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class ExtensionFailureMatrixTest {
     ActivityController<Activity> controller; Activity activity; FrameLayout root; View target;
     boolean broken;

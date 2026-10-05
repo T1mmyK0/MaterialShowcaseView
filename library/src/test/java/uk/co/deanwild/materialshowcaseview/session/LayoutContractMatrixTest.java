@@ -17,7 +17,7 @@ import uk.co.deanwild.materialshowcaseview.*;
 import static org.junit.Assert.*;
 
 /** V1/V2: reusable layout contracts, rather than one screenshot's coordinates. */
-@RunWith(RobolectricTestRunner.class) @Config(sdk = {28, 30}, qualifiers = "w1000dp-h1000dp-mdpi")
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28, 30}, qualifiers = "w1000dp-h1000dp-mdpi")
 public class LayoutContractMatrixTest {
     ActivityController<Activity> controller; Activity activity; FrameLayout root; Button target;
     int width, height;
@@ -112,8 +112,14 @@ public class LayoutContractMatrixTest {
     @Test public void sideTooltipRecoversNaturalWidthWhenSpaceIncreases() {
         configure(640, 700, false, 1);
         target.setTranslationX(-80);
+        // Keep the intrinsic size independent of the SDK's simulated text metrics.
+        View content = new View(activity) {
+            @Override protected void onMeasure(int widthSpec, int heightSpec) {
+                setMeasuredDimension(resolveSize(300, widthSpec), resolveSize(60, heightSpec));
+            }
+        };
         ShowcaseTooltip tooltip = ShowcaseTooltip.build(activity)
-                .text("This tooltip should recover its natural width after the target moves").position(ShowcaseTooltip.Position.LEFT);
+                .customView(content).position(ShowcaseTooltip.Position.LEFT);
         tooltip.configureTarget(root, target); ShowcaseTooltip.TooltipView bubble = tooltip.show(0);
         try {
             settle(); int narrow = bubble.getWidth();
@@ -122,6 +128,8 @@ public class LayoutContractMatrixTest {
             assertTrue("Width remained " + bubble.getWidth() + " after constraint " + narrow
                     + "; params=" + bubble.getLayoutParams().width + "; target=" + target.getX()
                     + "; cap=" + org.robolectric.util.ReflectionHelpers.getField(bubble, "constrainedWidth"), bubble.getWidth() > narrow);
+            assertEquals("Content did not recover its intrinsic width", 300, content.getWidth());
+            assertEquals(ViewGroup.LayoutParams.WRAP_CONTENT, bubble.getLayoutParams().width);
             assertTrue(bubble.getX() >= 0); assertTrue(bubble.getX() + bubble.getWidth() <= target.getX());
         } finally { tooltip.cancel(); }
     }

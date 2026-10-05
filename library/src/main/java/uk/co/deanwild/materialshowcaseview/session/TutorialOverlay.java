@@ -48,9 +48,8 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         super(root.getContext()); this.root = root; this.target = target; this.step = step; this.actions = actions; this.theme = theme;
         this.callbacks = callbacks;
         previousFocus = root.findFocus();
-        previousAccessibilityFocus = Build.VERSION.SDK_INT >= 21 ? accessibilityFocus(root) : null;
+        previousAccessibilityFocus = accessibilityFocus(root);
         setWillNotDraw(false); setFocusable(true);
-        if (Build.VERSION.SDK_INT < 18) setLayerType(View.LAYER_TYPE_SOFTWARE, null);
         panel = new ScrollView(getContext()); panel.setFillViewport(false); panel.setBackgroundColor(theme.surfaceColor);
         LinearLayout content = new LinearLayout(getContext()); content.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(theme.paddingDp); content.setPadding(padding, padding, padding, padding);
@@ -78,7 +77,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         view.setFocusable(true); return view;
     }
     private void button(LinearLayout content, CharSequence label, int resource, Runnable action) {
-        Button button = new Button(getContext()); if (Build.VERSION.SDK_INT >= 14) button.setAllCaps(false); button.setText(label == null ? getContext().getString(resource) : label);
+        Button button = new Button(getContext()); button.setAllCaps(false); button.setText(label == null ? getContext().getString(resource) : label);
         button.setMinHeight(dp(48)); button.setTextColor(theme.textColor); button.setOnClickListener(v -> callbacks.run(() -> { if (!closed && !exiting) action.run(); })); content.addView(button);
         if(theme.buttonTextAppearance!=0)button.setTextAppearance(getContext(),theme.buttonTextAppearance);
     }
@@ -100,7 +99,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
             setVisibility(VISIBLE);
             if (step.interaction != Step.Interaction.HINT) panel.requestFocus();
             if (closed) return;
-            if (Build.VERSION.SDK_INT >= 16) announceForAccessibility(step.title + ". " + step.text);
+            announceForAccessibility(step.title + ". " + step.text);
             // Actual shown means attached and visible at entrance start, including zero duration.
             animateAlpha(0, 1, null); shown.run();
         });
@@ -115,21 +114,15 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
                     ViewGroup group = (ViewGroup) child; focusGroups.put(group, group.getDescendantFocusability());
                     group.setDescendantFocusability(ViewGroup.FOCUS_BLOCK_DESCENDANTS);
                 }
-                if (Build.VERSION.SDK_INT >= 16) {
-                    accessibility.put(child, child.getImportantForAccessibility());
-                    hideAccessibility(child);
-                }
+                accessibility.put(child, child.getImportantForAccessibility());
+                hideAccessibility(child);
             }
         }
     }
     private void hideAccessibility(View view) {
-        if (Build.VERSION.SDK_INT < 16) return;
         if (!accessibility.containsKey(view)) accessibility.put(view, view.getImportantForAccessibility());
-        view.setImportantForAccessibility(Build.VERSION.SDK_INT >= 19 ? IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS : IMPORTANT_FOR_ACCESSIBILITY_NO);
-        if (Build.VERSION.SDK_INT < 19 && view instanceof ViewGroup)
-            for (int i=0;i<((ViewGroup)view).getChildCount();i++) hideAccessibility(((ViewGroup)view).getChildAt(i));
+        view.setImportantForAccessibility(IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
     }
-    @androidx.annotation.RequiresApi(21)
     private View accessibilityFocus(View view) {
         if (view.isAccessibilityFocused()) return view;
         if (view instanceof ViewGroup) for (int i=0;i<((ViewGroup)view).getChildCount();i++) {
@@ -300,7 +293,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         if (closed) return; closed = true;
         boolean restoreInputFocus = step.interaction != Step.Interaction.HINT || hasFocus();
         boolean restoreSpokenFocus = step.interaction != Step.Interaction.HINT
-                || (Build.VERSION.SDK_INT >= 21 && accessibilityFocus(this) != null);
+                || accessibilityFocus(this) != null;
         Scope cleanup = new Scope();
         // Register in reverse execution order. One application View throwing during
         // detachment/restoration must not prevent restoring the remaining background.
@@ -310,7 +303,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
             cleanup.own(() -> entry.getKey().setFocusable(entry.getValue()));
         for (Map.Entry<ViewGroup, Integer> entry : focusGroups.entrySet())
             cleanup.own(() -> entry.getKey().setDescendantFocusability(entry.getValue()));
-        if (Build.VERSION.SDK_INT >= 16) for (Map.Entry<View, Integer> entry : accessibility.entrySet())
+        for (Map.Entry<View, Integer> entry : accessibility.entrySet())
             cleanup.own(() -> entry.getKey().setImportantForAccessibility(entry.getValue()));
         cleanup.own(() -> { if (!detaching && getParent() == root) root.removeView(this); });
         cleanup.own(() -> setVisibility(GONE));
@@ -323,7 +316,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
     }
     @android.annotation.SuppressLint("AccessibilityFocus") // Restore the user's prior focus, never move it during presentation.
     private void restoreAccessibilityFocus() {
-        if (Build.VERSION.SDK_INT >= 16 && root.hasWindowFocus() && previousAccessibilityFocus != null && previousAccessibilityFocus.getWindowToken() != null)
+        if (root.hasWindowFocus() && previousAccessibilityFocus != null && previousAccessibilityFocus.getWindowToken() != null)
             previousAccessibilityFocus.performAccessibilityAction(android.view.accessibility.AccessibilityNodeInfo.ACTION_ACCESSIBILITY_FOCUS, null);
     }
 }

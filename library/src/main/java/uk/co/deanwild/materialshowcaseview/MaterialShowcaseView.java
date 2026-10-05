@@ -1,6 +1,5 @@
 package uk.co.deanwild.materialshowcaseview;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.Context;
 import android.graphics.Bitmap;
@@ -127,7 +126,6 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         init(context);
     }
 
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     public MaterialShowcaseView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init(context);
@@ -420,13 +418,11 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
         if (mTarget != null) {
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-                mBottomMargin = mRenderOverNav ? 0 : getSoftButtonsBarSizePort();
-                FrameLayout.LayoutParams contentLP = (LayoutParams) getLayoutParams();
-                if (contentLP != null && contentLP.bottomMargin != mBottomMargin) {
-                    contentLP.bottomMargin = mBottomMargin;
-                    setLayoutParams(contentLP);
-                }
+            mBottomMargin = mRenderOverNav ? 0 : getSoftButtonsBarSizePort();
+            FrameLayout.LayoutParams contentLP = (LayoutParams) getLayoutParams();
+            if (contentLP != null && contentLP.bottomMargin != mBottomMargin) {
+                contentLP.bottomMargin = mBottomMargin;
+                setLayoutParams(contentLP);
             }
 
             // apply the target position
@@ -1076,7 +1072,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
             if (showcaseView.mAnimationFactory == null) {
                 // create our animation factory
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && !showcaseView.mUseFadeAnimation) {
+                if (!showcaseView.mUseFadeAnimation) {
                     showcaseView.setAnimationFactory(new CircularRevealAnimationFactory());
                 } else {
                     showcaseView.setAnimationFactory(new FadeAnimationFactory());
@@ -1110,7 +1106,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         // Detachment replaces this view's tree observer. Unregister from the window first.
         ViewTreeObserver tree = getViewTreeObserver();
         if (mLayoutListener != null && tree.isAlive()) {
-            tree.removeGlobalOnLayoutListener(mLayoutListener);
+            tree.removeOnGlobalLayoutListener(mLayoutListener);
             tree.removeOnPreDrawListener(mLayoutListener);
         }
         mLayoutListener = null;
@@ -1120,7 +1116,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
                 if (mAnimationFactory instanceof CancellableAnimationFactory)
                     ((CancellableAnimationFactory) mAnimationFactory).cancel(this);
             });
-            failure = cleanup(failure, () -> { if (Build.VERSION.SDK_INT >= 14) animate().cancel(); });
+            failure = cleanup(failure, () -> animate().cancel());
             failure = cleanup(failure, () -> { if (toolTip != null) toolTip.cancel(); });
             failure = cleanup(failure, () -> {
                 // Window teardown traverses the parent's children itself. Mutating that
@@ -1171,7 +1167,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     public boolean show(final Activity activity) {
         checkMainThread();
         if (active || removing || detaching || activity.isFinishing()
-                || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed())) return false;
+                || activity.isDestroyed()) return false;
         if (toolTip != null && !(mTarget instanceof ViewTarget)) {
             throw new IllegalArgumentException("The target must be of type: " + ViewTarget.class.getCanonicalName());
         }
@@ -1198,9 +1194,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         }
 
         ((ViewGroup) activity.getWindow().getDecorView()).addView(this);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
-            requestApplyInsets();
-        }
+        requestApplyInsets();
 
         setShouldRender(true);
 
@@ -1229,19 +1223,12 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
                     getViewTreeObserver().addOnPreDrawListener(mPendingShowListener);
                     return;
                 }
-                boolean attached;
-                // taken from https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-master-dev/core/src/main/java/androidx/core/view/ViewCompat.java#3310
-                if (Build.VERSION.SDK_INT >= 19) {
-                    attached = isAttachedToWindow();
-                } else {
-                    attached = getWindowToken() != null;
-                }
-                if (!attached || !targetBelongsToWindow(activity.getWindow().getDecorView())
+                if (!isAttachedToWindow() || !targetBelongsToWindow(activity.getWindow().getDecorView())
                         || (mTarget instanceof ViewTarget && !((ViewTarget) mTarget).isReady())) { removeFromWindow(); return; }
                 if (mTarget != null) {
                     setTarget(mTarget);
                 }
-                if (mShouldAnimate && attached) {
+                if (mShouldAnimate) {
                     fadeIn();
                 } else {
                     setVisibility(VISIBLE);
@@ -1381,7 +1368,6 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
 
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.KITKAT_WATCH)
     @Override
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
         updateSystemBarInsets(insets);
@@ -1393,7 +1379,6 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         return insets;
     }
 
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.KITKAT_WATCH)
     private void updateSystemBarInsets(WindowInsets insets) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             android.graphics.Insets bars = insets.getInsets(
@@ -1408,11 +1393,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
     public int getSoftButtonsBarSizePort() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            WindowInsets insets = getRootWindowInsets();
-            if (insets != null) {
-                updateSystemBarInsets(insets);
-            }
+        WindowInsets insets = getRootWindowInsets();
+        if (insets != null) {
+            updateSystemBarInsets(insets);
         }
         return mNavigationBarBottomInset;
     }

@@ -3,11 +3,9 @@ package uk.co.deanwild.materialshowcaseview;
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.annotation.TargetApi;
 import android.graphics.Point;
 import android.os.Build;
 import android.view.View;
-import android.view.ViewAnimationUtils;
 import android.view.animation.AccelerateDecelerateInterpolator;
 
 
@@ -29,7 +27,7 @@ public class FadeAnimationFactory implements CancellableAnimationFactory{
     @Override
     public void animateInView(View target, Point point, long duration, final AnimationStartListener listener) {
         animations.cancel(target);
-        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !isAttachedToWindow(target)) {
+        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !target.isAttachedToWindow()) {
             target.setAlpha(VISIBLE);
             listener.onAnimationStart();
             return;
@@ -59,7 +57,7 @@ public class FadeAnimationFactory implements CancellableAnimationFactory{
     @Override
     public void animateOutView(View target, Point point, long duration, final AnimationEndListener listener) {
         animations.cancel(target);
-        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !isAttachedToWindow(target)) {
+        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !target.isAttachedToWindow()) {
             target.setAlpha(INVISIBLE);
             listener.onAnimationEnd();
             return;
@@ -84,13 +82,6 @@ public class FadeAnimationFactory implements CancellableAnimationFactory{
             }
         });
         animations.start(target, oa);
-    }
-
-    private boolean isAttachedToWindow(View target) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            return target.isAttachedToWindow();
-        }
-        return target.getWindowToken() != null;
     }
 
     @Override

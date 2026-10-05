@@ -2,19 +2,29 @@
 
 Validation performed on 2026-10-05 using the repository's Gradle 9.8.0 / AGP 9.4.1 setup,
 installed JetBrains JDK 25 and Android SDK 37.2. Android framework tests use Robolectric 4.17,
-APIs 28 and 30; deterministic engine tests use a virtual clock and deliberately stale callbacks.
+APIs 24, 28 and 30; deterministic engine tests use a virtual clock and deliberately stale callbacks.
+The core, lifecycle adapter and sample now all require API 24.
 
-Final result: **253 tests passed, 0 failed, 0 skipped** (95 deterministic session tests,
-79 legacy Android regressions, 55 Android host/rendering/geometry tests, 6 lifecycle/Back/RecyclerView
-tests and 18 sample startup/policy-dialog tests). Lint reports **0 errors** across all modules:
+Final result: **400 tests passed, 0 failed, 0 skipped** (352 core, 12 lifecycle/Back/RecyclerView
+and 36 sample startup/policy-dialog tests). This includes 95 deterministic session tests and
+147 added API 24 executions of existing Android regression tests. Lint reports **0 errors** across all modules:
 1 core dependency-version warning, 2 lifecycle dependency-version warnings, and 31 sample warnings.
 The sample APK and both release AARs build successfully. Gradle also reports deprecations for
 future Gradle 10, and Robolectric/Conscrypt emits a JDK native-access warning; neither failed checks.
 
 The completed [structured review matrix](REVIEW_MATRIX.md) records the ownership/callback audit,
-8-phase cancellation matrix, 144 content/tooltip layout configurations, confirmed repairs and
-unverified device cells. It added 55 test cases to the previous 198. The latest build log is
-`build/structured-final.log`; the dated review sections below preserve earlier evidence.
+8-phase cancellation matrix, content/tooltip layouts, confirmed repairs and unverified device cells.
+The layout matrix now covers 216 configurations across APIs 24/28/30. The earlier structured review
+added 55 test cases to the previous 198; the API 24 expansion brings the suite from 253 to 400.
+The latest build log is `build/min-sdk24-validation.log`; `build/structured-final.log` and the dated
+review sections below preserve earlier evidence.
+
+The expanded tests retain the existing API 28/30 coverage, with modern inset tests on API 30.
+The tooltip width-recovery fixture uses content with a fixed intrinsic size so differences in
+simulated text metrics do not determine whether it is constrained. The outside-dialog test sends
+a complete DOWN/UP gesture to exercise dismissal on both API 24 and API 30. All module merged
+manifests declare minSdk 24. No new emulator/device run was performed for this SDK cleanup;
+the device observations below are from the earlier review.
 
 Reproduce:
 
@@ -216,9 +226,9 @@ Build outputs:
 - Only an API 24 system image is installed. **Modern window-inset behavior has not been verified on
   a modern device/emulator**; the API 30 keyboard/cutout tests use framework simulation. TalkBack
   is not installed on the emulator, so actual spoken navigation and switch access remain unverified.
-  Predictive gestures on Android 13+, split-screen device QA, heap profiling and API 12 runtime
-  verification remain outside this run. Large-font RTL/landscape checks now cover the recorded
-  API 24 sample scenarios and APIs 28/30 framework matrix, not every device, locale or font.
+  Predictive gestures on Android 13+, split-screen device QA and heap profiling remain outside
+  this run. API 12–23 are no longer supported. Large-font RTL/landscape checks cover the recorded
+  API 24 sample scenarios and APIs 24/28/30 framework matrix, not every device, locale or font.
 - The built-in target interaction mode supports existing click actions. It deliberately does not
   forward arbitrary editable/drag/multitouch gestures through the mask; use application-confirmed
   actions or nonmodal hints for those flows.

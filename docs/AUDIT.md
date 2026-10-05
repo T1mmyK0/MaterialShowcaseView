@@ -1,5 +1,12 @@
 # Source audit and compatibility decisions
 
+The supported platform baseline is Android 7.0 (API 24) for the core, lifecycle adapter
+and sample. The SDK increase removes 27 pre-24 version checks, obsolete API annotations,
+attachment and accessibility fallbacks, and deprecated layout-listener removal calls.
+Explicit fade animations, nullable root insets and API 26/30 branches remain. The
+legacy bitmap renderer and custom Shape/Paint support are unchanged; the SDK increase
+does not by itself replace rendering or add runtime dependencies to the core.
+
 The original implementation was inspected before introducing sessions: MaterialShowcaseView,
 MaterialShowcaseSequence, PrefsManager, ShowcaseConfig, ViewTarget, ShowcaseTooltip,
 FadeAnimationFactory and CircularRevealAnimationFactory.

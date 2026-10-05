@@ -16,7 +16,7 @@ import uk.co.deanwild.materialshowcaseview.session.*;
 import java.time.Duration;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk=28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class LifecycleTutorialTest {
     ActivityController<Activity> controller; Activity activity; FrameLayout root; Button target;
     static class Owner implements LifecycleOwner {

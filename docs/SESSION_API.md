@@ -1,8 +1,8 @@
 # Lifecycle-aware tutorials
 
-`library` keeps the original `uk.co.deanwild.materialshowcaseview` API and minSdk 12.
+`library` keeps the original `uk.co.deanwild.materialshowcaseview` API and requires minSdk 24.
 The additive `session` package separates definitions, execution, persistence and rendering.
-`lifecycle` is an optional AndroidX adapter (minSdk 23); it includes LifecycleOwner,
+`lifecycle` is an optional AndroidX adapter (minSdk 24); it includes LifecycleOwner,
 OnBackPressedDispatcher and RecyclerView integration. No Compose dependency is introduced.
 
 All session mutations, host methods, listener callbacks, preparation completions, blocker releases
@@ -36,7 +36,7 @@ and create a new host/session for each new view. The fragment view lifecycle is 
 the fragment lifecycle ([Android guidance](https://developer.android.com/guide/fragments/lifecycle)).
 The adapter disposes on destruction. Dispose the screen coordinator when the screen is destroyed.
 Without the adapter forward resumed/paused state to `host.setResumed()` and call `session.dispose()`
-on destruction. On API 12–17 also forward window focus changes through `host.invalidate()`.
+on destruction. The host observes window focus changes automatically on all supported versions.
 
 Pass a Dialog's Window to deliberately scope a tutorial to a dialog or bottom sheet; use that
 presentation's owner and dispose on its dismissal. Do not use an Activity host for targets inside

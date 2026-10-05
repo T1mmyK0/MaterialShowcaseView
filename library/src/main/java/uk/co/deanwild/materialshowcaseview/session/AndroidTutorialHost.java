@@ -1,7 +1,6 @@
 package uk.co.deanwild.materialshowcaseview.session;
 
 import android.graphics.Rect;
-import android.os.Build;
 import android.view.*;
 import java.util.*;
 
@@ -123,8 +122,8 @@ public final class AndroidTutorialHost implements TutorialHost {
             return true;
         };
         tree.addOnPreDrawListener(geometry);
-        // Window focus changes need no Activity override on API 18+.
-        Cancellation focus = Build.VERSION.SDK_INT >= 18 ? observeFocus(root, tree, notify) : Cancellation.NONE;
+        // Observe window focus changes without requiring an Activity override.
+        Cancellation focus = observeFocus(root, tree, notify);
         View.OnAttachStateChangeListener attachment = new View.OnAttachStateChangeListener() {
             public void onViewAttachedToWindow(View v) { notify.run(); }
             public void onViewDetachedFromWindow(View v) { notify.run(); }
@@ -135,7 +134,7 @@ public final class AndroidTutorialHost implements TutorialHost {
             closed[0] = true;
             observers.remove(notify); focus.cancel(); observedRoot.removeOnAttachStateChangeListener(attachment);
             ViewTreeObserver current = tree.isAlive() ? tree : observedRoot.getViewTreeObserver();
-            if (current.isAlive()) { current.removeGlobalOnLayoutListener(layout); current.removeOnScrollChangedListener(scroll); current.removeOnPreDrawListener(geometry); }
+            if (current.isAlive()) { current.removeOnGlobalLayoutListener(layout); current.removeOnScrollChangedListener(scroll); current.removeOnPreDrawListener(geometry); }
         });
     }
     private static long geometrySignature(View view, int[] xy, Rect visible) {
@@ -152,7 +151,6 @@ public final class AndroidTutorialHost implements TutorialHost {
         while (ancestor instanceof View) { result = result * 31 + Float.floatToIntBits(((View) ancestor).getAlpha()); ancestor = ancestor.getParent(); }
         return result;
     }
-    @androidx.annotation.RequiresApi(18)
     private Cancellation observeFocus(View observedRoot, ViewTreeObserver tree, Runnable changed) {
         ViewTreeObserver.OnWindowFocusChangeListener listener = focused -> changed.run();
         tree.addOnWindowFocusChangeListener(listener);

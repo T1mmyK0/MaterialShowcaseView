@@ -3,7 +3,6 @@ package uk.co.deanwild.materialshowcaseview;
 import android.animation.Animator;
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.annotation.TargetApi;
 import android.graphics.Point;
 import android.os.Build;
 import android.view.View;
@@ -30,11 +29,10 @@ public class CircularRevealAnimationFactory implements CancellableAnimationFacto
         return (float) Math.hypot(Math.max(point.x, target.getWidth() - point.x), Math.max(point.y, target.getHeight() - point.y));
     }
 
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     @Override
     public void animateInView(View target, Point point, long duration, final AnimationStartListener listener) {
         animations.cancel(target);
-        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !isAttachedToWindow(target)) {
+        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !target.isAttachedToWindow()) {
             listener.onAnimationStart();
             return;
         }
@@ -65,11 +63,10 @@ public class CircularRevealAnimationFactory implements CancellableAnimationFacto
         animations.start(target, animator);
     }
 
-    @androidx.annotation.RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     @Override
     public void animateOutView(View target, Point point, long duration, final AnimationEndListener listener) {
         animations.cancel(target);
-        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !isAttachedToWindow(target)) {
+        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !target.isAttachedToWindow()) {
             listener.onAnimationEnd();
             return;
         }
@@ -98,13 +95,6 @@ public class CircularRevealAnimationFactory implements CancellableAnimationFacto
         });
 
         animations.start(target, animator);
-    }
-
-    private boolean isAttachedToWindow(View target) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            return target.isAttachedToWindow();
-        }
-        return target.getWindowToken() != null;
     }
 
     @Override

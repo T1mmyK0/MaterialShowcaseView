@@ -15,7 +15,7 @@ import static org.junit.Assert.*;
 import static uk.co.deanwild.materialshowcaseview.session.TutorialSession.*;
 
 /** L3/L4: Android removal and custom content failures must release modal state. */
-@RunWith(RobolectricTestRunner.class) @Config(sdk = {28, 30})
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28, 30})
 public class AndroidOwnershipMatrixTest {
     ActivityController<Activity> controller;
     Activity activity; FrameLayout root; Button target;

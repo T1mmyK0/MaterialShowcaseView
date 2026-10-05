@@ -19,7 +19,7 @@ import uk.co.deanwild.materialshowcaseview.session.Tutorial;
 import uk.co.deanwild.materialshowcaseview.session.Step;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 30)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 30})
 public class PolicyDialogTest {
     ActivityController<AiTutorialActivity> controller; AiTutorialActivity activity;
     @Before public void setup() {
@@ -43,8 +43,16 @@ public class PolicyDialogTest {
         open().onBackPressed(); assertCancelled();
     }
     @Test public void outsideTouchCancels() {
-        AlertDialog dialog = open(); MotionEvent event = MotionEvent.obtain(0, 0, MotionEvent.ACTION_OUTSIDE, -100, -100, 0);
-        try { dialog.onTouchEvent(event); } finally { event.recycle(); } assertCancelled();
+        // Send a full outside tap: older versions dismiss on DOWN, newer versions on UP.
+        AlertDialog dialog = open();
+        MotionEvent down = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, -100, -100, 0);
+        MotionEvent up = MotionEvent.obtain(0, 10, MotionEvent.ACTION_UP, -100, -100, 0);
+        try {
+            boolean handled = dialog.onTouchEvent(down);
+            handled |= dialog.onTouchEvent(up);
+            assertTrue(handled);
+        } finally { down.recycle(); up.recycle(); }
+        assertCancelled();
     }
     @Test public void programmaticDismissalDoesNotAccept() { open().dismiss(); assertCancelled(); }
     @Test public void acceptingReleasesGateWithoutCancellingSession() {

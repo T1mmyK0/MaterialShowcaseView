@@ -1,5 +1,13 @@
 # Unreleased — lifecycle-aware onboarding
 
+- **Breaking platform requirement:** raised the core, optional lifecycle adapter and sample
+  to Android 7.0 (API 24). Consumers must also use minSdk 24 or newer.
+- Removed pre-24 animation, accessibility, clipping and inset compatibility branches; retained
+  explicit fade animations and API 26/30 behavior guards. Updated layout-listener removal and HTML parsing.
+- Extended legacy, session, lifecycle and sample regression suites to run on API 24 alongside
+  their existing API 28/30 coverage.
+  Validation: 400 tests pass (147 added API 24 executions), no lint errors, sample APK and both
+  release AARs build successfully. Device evidence remains from the earlier review.
 - Added immutable tutorial/step definitions, explicit sessions, cancellation scopes, injectable
   scheduling, typed diagnostic callbacks and mutually exclusive terminal outcomes.
 - Added lifecycle/window/application gates, nested blockers, lazy validated targets, asynchronous
@@ -75,7 +83,7 @@
   API 24 checks include rotation, RTL and doubled text; modern-device insets and real TalkBack
   remain unverified.
 
-Core minSdk remains 12. The optional AndroidX module requires API 23.
+Core and optional AndroidX module minSdk are both 24.
 No Compose or analytics service dependency is added. See
 [API contracts](docs/SESSION_API.md), [consumer migration](docs/AI_TUTORIAL_MIGRATION.md) and
 [audit](docs/AUDIT.md) before adopting corrected legacy dismissal behavior.

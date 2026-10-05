@@ -15,7 +15,7 @@ import java.util.*;
 import static org.junit.Assert.*;
 import static uk.co.deanwild.materialshowcaseview.session.TutorialSession.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class AndroidSafetyTest {
     ActivityController<Activity> controller; Activity activity; FrameLayout root; Button target;
     TutorialCoordinator coordinator; AndroidTutorialHost host; TutorialSession session;

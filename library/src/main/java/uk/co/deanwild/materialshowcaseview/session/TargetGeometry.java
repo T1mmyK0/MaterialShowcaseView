@@ -38,7 +38,7 @@ final class TargetGeometry {
         host.getWindowVisibleDisplayFrame(out);
         Rect bounds = new Rect();
         if (!visibleOnScreen(host, bounds) || !out.intersect(bounds)) { out.setEmpty(); return false; }
-        if (host instanceof android.view.ViewGroup && (Build.VERSION.SDK_INT < 21 || ((android.view.ViewGroup) host).getClipToPadding())) {
+        if (host instanceof android.view.ViewGroup && ((android.view.ViewGroup) host).getClipToPadding()) {
             RectF padded = new RectF(host.getPaddingLeft(), host.getPaddingTop(),
                     host.getWidth() - host.getPaddingRight(), host.getHeight() - host.getPaddingBottom());
             mapToScreen(host, padded); padded.roundOut(bounds);

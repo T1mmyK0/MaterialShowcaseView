@@ -15,7 +15,7 @@ import java.util.*;
 import uk.co.deanwild.materialshowcaseview.session.*;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class AndroidRegressionTest {
     ActivityController<Activity> controller;
     Activity activity; Button target; FrameLayout content;

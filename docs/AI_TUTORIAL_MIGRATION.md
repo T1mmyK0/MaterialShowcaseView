@@ -1,5 +1,9 @@
 # Migrating an AI tutorial controller
 
+Set the consuming app's `minSdk` to at least 24 (Android 7.0) before upgrading.
+Both the core library and optional lifecycle adapter now require API 24; this version
+drops support for older Android releases while preserving the existing Java APIs.
+
 The executable Java reference is `sample/.../AiTutorialActivity.java`. Launch **Lifecycle AI
 tutorials** from the sample menu. It declares four stable steps for each provider:
 

@@ -36,7 +36,7 @@ public final class TargetValidator {
         ViewParent ancestor = target.getParent();
         while (ancestor instanceof android.view.ViewGroup) {
             android.view.ViewGroup group = (android.view.ViewGroup) ancestor;
-            if (android.os.Build.VERSION.SDK_INT < 18 || group.getClipChildren()) {
+            if (group.getClipChildren()) {
                 Rect clipping = new Rect();
                 if (!TargetGeometry.usableOnScreen(group, clipping) || !viewport.intersect(clipping)) return Reason.CLIPPED;
             }

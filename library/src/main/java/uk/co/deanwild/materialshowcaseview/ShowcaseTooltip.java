@@ -221,19 +221,17 @@ public class ShowcaseTooltip {
         viewport.offset(-origin[0], -origin[1]);
         if (!viewport.intersect(0, 0, parent.getWidth(), parent.getHeight())) viewport.setEmpty();
         // Edge-to-edge windows can include system bars in their visible display frame.
-        if (Build.VERSION.SDK_INT >= 23) {
-            WindowInsets insets = parent.getRootWindowInsets();
-            if (insets != null) {
-                View window = parent.getRootView(); int[] windowOrigin = new int[2]; window.getLocationOnScreen(windowOrigin);
-                int left = insets.getSystemWindowInsetLeft(), right = insets.getSystemWindowInsetRight();
-                if (Build.VERSION.SDK_INT >= 30) {
-                    android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
-                    left = safe.left; right = safe.right;
-                }
-                viewport.left = Math.max(viewport.left, windowOrigin[0] + left - origin[0]);
-                viewport.right = Math.max(viewport.left, Math.min(viewport.right,
-                        windowOrigin[0] + window.getWidth() - right - origin[0]));
+        WindowInsets insets = parent.getRootWindowInsets();
+        if (insets != null) {
+            View window = parent.getRootView(); int[] windowOrigin = new int[2]; window.getLocationOnScreen(windowOrigin);
+            int left = insets.getSystemWindowInsetLeft(), right = insets.getSystemWindowInsetRight();
+            if (Build.VERSION.SDK_INT >= 30) {
+                android.graphics.Insets safe = insets.getInsets(WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                left = safe.left; right = safe.right;
             }
+            viewport.left = Math.max(viewport.left, windowOrigin[0] + left - origin[0]);
+            viewport.right = Math.max(viewport.left, Math.min(viewport.right,
+                    windowOrigin[0] + window.getWidth() - right - origin[0]));
         }
     }
 
@@ -257,7 +255,7 @@ public class ShowcaseTooltip {
     public void cancel() {
         cancelPending();
         tooltip_view.animate().setListener(null);
-        if (Build.VERSION.SDK_INT >= 14) tooltip_view.animate().cancel();
+        tooltip_view.animate().cancel();
         tooltip_view.removeNow();
     }
 
@@ -368,7 +366,7 @@ public class ShowcaseTooltip {
     public static class FadeTooltipAnimation implements CancellableTooltipAnimation {
         @Override public void cancel(View view) {
             view.animate().setListener(null);
-            if (Build.VERSION.SDK_INT >= 14) view.animate().cancel();
+            view.animate().cancel();
         }
 
         private long fadeDuration = 400;
@@ -497,8 +495,7 @@ public class ShowcaseTooltip {
 
         public void setText(String text) {
             if (childView instanceof TextView) {
-                ((TextView) this.childView).setText(Build.VERSION.SDK_INT >= Build.VERSION_CODES.N
-                        ? Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY) : Html.fromHtml(text));
+                ((TextView) this.childView).setText(Html.fromHtml(text, Html.FROM_HTML_MODE_LEGACY));
             }
             postInvalidate();
         }

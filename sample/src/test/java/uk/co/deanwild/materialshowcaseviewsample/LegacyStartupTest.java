@@ -14,7 +14,7 @@ import java.time.Duration;
 import uk.co.deanwild.materialshowcaseview.MaterialShowcaseView;
 import static org.junit.Assert.*;
 
-@RunWith(RobolectricTestRunner.class) @Config(sdk = 28)
+@RunWith(RobolectricTestRunner.class) @Config(sdk = {24, 28})
 public class LegacyStartupTest {
     @Test public void singleExampleStartsOnFirstVisit() { assertStarts(SimpleSingleExample.class); }
     @Test public void customExampleStartsOnFirstVisit() { assertStarts(CustomExample.class); }

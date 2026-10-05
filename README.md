@@ -12,7 +12,8 @@ New integrations should use `Tutorial`, `Step`, `TutorialSession` and `AndroidTu
 Run `./gradlew :library:testDebugUnitTest :sample:assembleDebug` to test and build. The sample menu's
 **Lifecycle AI tutorials** screen exercises changing providers, policy dialogs, long prompts and
 targets that can be hidden, disabled, moved or removed. The optional `:lifecycle` module supplies
-AndroidX lifecycle, Back and RecyclerView adapters without raising the core library's minimum SDK.
+AndroidX lifecycle, Back and RecyclerView adapters. All modules require Android 7.0 (API 24) or newer;
+the core library remains free of external runtime dependencies.
 
 *Looking for collaborators to help maintain this library, drop me a line at me@deanwild.co.uk if you want to help.*
 
@@ -91,9 +92,11 @@ For command-line builds, set `JAVA_HOME` to your JDK directory and run:
 On Windows, use `gradlew.bat clean build`. The library AARs are generated in
 `library/build/outputs/aar/`, and sample APKs in `sample/build/outputs/apk/`.
 
-The library remains free of external runtime dependencies and retains its API 12
-minimum. The sample requires Android 6.0 (API 23) or newer, uses AndroidX and
-Material Components, and handles system-bar and display-cutout insets for
+The library, optional lifecycle adapter and sample require Android 7.0 (API 24) or
+newer. This source version drops support for API 12–23 in the core and API 23 in
+the lifecycle adapter and sample; consuming apps must set `minSdk` to at least 24.
+The core remains free of external runtime dependencies. The sample uses AndroidX
+and Material Components and handles system-bar and display-cutout insets for
 edge-to-edge layouts. Normal lint checks are enabled, including target SDK checks.
 
 Android libraries specify a compile SDK; the consuming application controls the
