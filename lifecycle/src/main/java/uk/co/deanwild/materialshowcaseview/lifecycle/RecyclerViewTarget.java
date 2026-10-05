@@ -27,7 +27,8 @@ public final class RecyclerViewTarget {
         Runnable scroll = () -> {
             if (work.isClosed()) return;
             for (int i = 0; i < adapter.getItemCount(); i++) if (adapter.getItemId(i) == itemId) { recycler.scrollToPosition(i); break; }
-            if (resolve() != null) { work.cancel(); ready.run(); }
+            // Scrolling can synchronously attach the item and complete via the listener.
+            if (!work.isClosed() && resolve() != null) { work.cancel(); ready.run(); }
         };
         RecyclerView.AdapterDataObserver data = new RecyclerView.AdapterDataObserver() {
             public void onChanged() { scroll.run(); }

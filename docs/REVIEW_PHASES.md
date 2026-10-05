@@ -1,5 +1,8 @@
 # Review order
 
+For the completed contract-based review, executable coverage and remaining device limits, see
+[REVIEW_MATRIX.md](REVIEW_MATRIX.md). The layers below describe how to read the implementation.
+
 The working-tree implementation is organized into four reviewable layers. No Git commits or
 publication were performed, and pre-existing changes to the wrapper JAR and SampleActivity were
 left intact.

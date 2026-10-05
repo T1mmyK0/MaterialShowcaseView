@@ -124,7 +124,7 @@ public final class AndroidTutorialHost implements TutorialHost {
         };
         tree.addOnPreDrawListener(geometry);
         // Window focus changes need no Activity override on API 18+.
-        Cancellation focus = Build.VERSION.SDK_INT >= 18 ? observeFocus(tree, notify) : Cancellation.NONE;
+        Cancellation focus = Build.VERSION.SDK_INT >= 18 ? observeFocus(root, tree, notify) : Cancellation.NONE;
         View.OnAttachStateChangeListener attachment = new View.OnAttachStateChangeListener() {
             public void onViewAttachedToWindow(View v) { notify.run(); }
             public void onViewDetachedFromWindow(View v) { notify.run(); }
@@ -153,10 +153,15 @@ public final class AndroidTutorialHost implements TutorialHost {
         return result;
     }
     @androidx.annotation.RequiresApi(18)
-    private Cancellation observeFocus(ViewTreeObserver tree, Runnable changed) {
+    private Cancellation observeFocus(View observedRoot, ViewTreeObserver tree, Runnable changed) {
         ViewTreeObserver.OnWindowFocusChangeListener listener = focused -> changed.run();
         tree.addOnWindowFocusChangeListener(listener);
-        return () -> { if (tree.isAlive()) tree.removeOnWindowFocusChangeListener(listener); };
+        return () -> {
+            // A listener registered before attachment moves from the floating tree into
+            // the window's observer, invalidating the original tree.
+            ViewTreeObserver current = tree.isAlive() ? tree : observedRoot.getViewTreeObserver();
+            if (current.isAlive()) current.removeOnWindowFocusChangeListener(listener);
+        };
     }
     @Override public Cancellation prepare(Step step, Scope scope, Runnable complete) {
         return prepare(step, scope, complete, Runnable::run);

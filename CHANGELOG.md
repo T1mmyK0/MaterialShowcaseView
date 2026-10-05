@@ -55,8 +55,25 @@
 - Released legacy overlays and sequence ownership when custom target geometry updates fail.
 - Preserved progress revisions during global reset so stale sessions cannot restore cleared progress;
   legacy flags and malformed records still reset together.
-- Validation: 188 passing tests; no lint errors; sample APK and release AAR builds pass.
-  API 24 emulator smoke checks completed; modern-device insets and real TalkBack remain unverified.
+- Released legacy overlays and sequence ownership after custom drawing, touch geometry and
+  pre-draw target failures; removal during drawing cannot reuse a recycled mask bitmap.
+- Kept visible tooltips anchored during target motion and placement changes without replaying
+  entrance animations. Hidden/detached targets release the tooltip and its tracking observer.
+- Constrained tooltip placement to the usable window width, fixing landscape navigation-bar clipping.
+- Removed focus listeners transferred into the window during attachment and prevented duplicate
+  RecyclerView preparation completions when scrolling synchronously attaches the target.
+- Cancelled sessions when their Android overlay is removed during entrance, display or exit;
+  background focus/accessibility restoration continues even when custom content detachment throws.
+- Routed tooltip content and asynchronous failures through complete showcase/sequence cleanup,
+  and released sequence ownership after rejected startup without persisting completion.
+- Restored tooltip width when a moving anchor provides more space, and cancelled visible legacy
+  showcases whose targets become hidden, detached or transparent.
+- Fixed the legacy rotation crash caused by removing children during Android's window teardown.
+- Made the sample tooltip toolbar grow with enlarged text instead of clipping its Show control.
+- Added a structured ownership, lifecycle and layout [review matrix](docs/REVIEW_MATRIX.md).
+  Validation: 253 passing tests; no lint errors; sample APK and release AAR builds pass.
+  API 24 checks include rotation, RTL and doubled text; modern-device insets and real TalkBack
+  remain unverified.
 
 Core minSdk remains 12. The optional AndroidX module requires API 23.
 No Compose or analytics service dependency is added. See

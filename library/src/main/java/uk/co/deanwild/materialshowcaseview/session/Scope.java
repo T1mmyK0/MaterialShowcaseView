@@ -17,7 +17,11 @@ public final class Scope implements Cancellation {
         closed = true;
         RuntimeException error = null;
         for (int i = resources.size() - 1; i >= 0; i--) {
-            try { resources.get(i).cancel(); } catch (RuntimeException e) { if (error == null) error = e; }
+            try { resources.get(i).cancel(); }
+            catch (RuntimeException e) {
+                if (error == null) error = e;
+                else if (error != e) error.addSuppressed(e);
+            }
         }
         resources.clear();
         if (error != null) throw error;

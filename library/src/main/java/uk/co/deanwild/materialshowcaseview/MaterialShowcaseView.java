@@ -99,7 +99,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     private ShowcaseTooltip toolTip;
     private boolean toolTipShown;
     private long generation;
-    private boolean active, hiding, notified, displayNotified, removing, committing;
+    private boolean active, hiding, notified, displayNotified, removing, committing, detaching;
     private boolean tap;
     private float downX, downY;
     private Target touchTarget;
@@ -173,7 +173,12 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     @Override
     protected void onDraw(Canvas canvas) {
         super.onDraw(canvas);
+        final long token = generation;
+        try { drawMask(canvas, token); }
+        catch (RuntimeException error) { throw presentationFailure(token, error); }
+    }
 
+    private void drawMask(Canvas canvas, long token) {
         // don't bother drawing if we're not ready
         if (!mShouldRender) return;
 
@@ -214,6 +219,8 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
         // draw (erase) shape
         mShape.draw(mCanvas, mEraser, mXPosition, mYPosition);
+        // A custom shape may remove or replace this presentation while drawing.
+        if (generation != token || !mShouldRender) return;
 
         // Draw the bitmap on our views  canvas.
         canvas.drawBitmap(mBitmap, 0, 0, null);
@@ -221,14 +228,51 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
     @Override
     protected void onDetachedFromWindow() {
-        super.onDetachedFromWindow();
-        removeFromWindow();
-        if (mDetachedListener != null && !committing)
-            mDetachedListener.onShowcaseDetached(this, false, false);
+        detaching = true;
+        try {
+            super.onDetachedFromWindow();
+            RuntimeException failure = cleanup(null, this::removeFromWindow);
+            failure = cleanup(failure, () -> {
+                if (mDetachedListener != null && !committing)
+                    mDetachedListener.onShowcaseDetached(this, false, false);
+            });
+            if (failure != null) throw failure;
+        } finally { detaching = false; }
+    }
+
+    @Override protected void onMeasure(int width, int height) {
+        long token = generation;
+        try { super.onMeasure(width, height); }
+        catch (RuntimeException error) { throw presentationFailure(token, error); }
+    }
+
+    @Override protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        long token = generation;
+        try { super.onLayout(changed, left, top, right, bottom); }
+        catch (RuntimeException error) { throw presentationFailure(token, error); }
+    }
+
+    @Override protected void dispatchDraw(Canvas canvas) {
+        long token = generation; int saved = canvas.save();
+        try { super.dispatchDraw(canvas); }
+        catch (RuntimeException error) { throw presentationFailure(token, error); }
+        finally { canvas.restoreToCount(saved); }
+    }
+
+    @Override public boolean dispatchTouchEvent(MotionEvent event) {
+        long token = generation;
+        try { return super.dispatchTouchEvent(event); }
+        catch (RuntimeException error) { throw presentationFailure(token, error); }
     }
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
+        final long token = generation;
+        try { return handleTouch(event); }
+        catch (RuntimeException error) { throw presentationFailure(token, error); }
+    }
+
+    private boolean handleTouch(MotionEvent event) {
         if (!active || hiding || getVisibility() != VISIBLE) { tap = false; touchTarget = null; return true; }
         switch (event.getActionMasked()) {
             case MotionEvent.ACTION_DOWN:
@@ -255,13 +299,8 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
                             || !touchVisibleBounds.equals(visibleTargetBounds())
                             || !touchVisibleBounds.contains((int) event.getX() + touchOrigin[0], (int) event.getY() + touchOrigin[1])) break;
                     long token = generation;
-                    try {
-                        if (mTarget instanceof ViewTarget) ((ViewTarget) mTarget).getView().performClick();
-                        if (generation == token && mDismissOnTargetTouch) hide();
-                    } catch (RuntimeException error) {
-                        if (generation == token) removeFromWindow();
-                        throw error;
-                    }
+                    if (mTarget instanceof ViewTarget) ((ViewTarget) mTarget).getView().performClick();
+                    if (generation == token && mDismissOnTargetTouch) hide();
                 } else if (clicked && mDismissOnTouch) hide();
                 break;
         }
@@ -759,8 +798,16 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         @Override public boolean onPreDraw() {
             // Property animations and scrolling can move a target without a layout pass.
             // Only refresh changed bounds so explicit showcase-position animations still work.
-            if (active && !hiding && mTarget instanceof ViewTarget
-                    && !lastTargetBounds.equals(mTarget.getBounds())) setTarget(mTarget);
+            final long token = generation;
+            try {
+                if (active && !hiding && mTarget instanceof ViewTarget) {
+                    ViewTarget target = (ViewTarget) mTarget;
+                    if (getVisibility() == VISIBLE && (!target.isReady()
+                            || target.getView().getWindowToken() != getWindowToken())) {
+                        removeFromWindow();
+                    } else if (!lastTargetBounds.equals(target.getBounds())) setTarget(target);
+                }
+            } catch (RuntimeException error) { throw presentationFailure(token, error); }
             return true;
         }
     }
@@ -1076,7 +1123,10 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
             failure = cleanup(failure, () -> { if (Build.VERSION.SDK_INT >= 14) animate().cancel(); });
             failure = cleanup(failure, () -> { if (toolTip != null) toolTip.cancel(); });
             failure = cleanup(failure, () -> {
-                if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this);
+                // Window teardown traverses the parent's children itself. Mutating that
+                // list from onDetachedFromWindow can crash Android's traversal.
+                if (detaching) setVisibility(GONE);
+                else if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this);
             });
         } finally {
             if (mBitmap != null) { mBitmap.recycle(); mBitmap = null; }
@@ -1120,7 +1170,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
      */
     public boolean show(final Activity activity) {
         checkMainThread();
-        if (active || removing || activity.isFinishing()
+        if (active || removing || detaching || activity.isFinishing()
                 || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed())) return false;
         if (toolTip != null && !(mTarget instanceof ViewTarget)) {
             throw new IllegalArgumentException("The target must be of type: " + ViewTarget.class.getCanonicalName());
@@ -1262,6 +1312,11 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     private RuntimeException presentationFailure(long token, RuntimeException error) {
         // Application callbacks may have started another presentation before throwing.
         return generation == token ? cleanup(error, this::removeFromWindow) : error;
+    }
+
+    Runnable capturePresentationRemoval() {
+        final long token = generation;
+        return () -> { if (generation == token) removeFromWindow(); };
     }
 
     public void animateOut() {

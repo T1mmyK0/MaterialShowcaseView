@@ -29,6 +29,149 @@ public class AndroidRegressionTest {
     void idle(long ms) { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(ms)); }
     @After public void cleanup() { controller.pause().stop().destroy(); }
     MaterialShowcaseView view(int delay) { return new MaterialShowcaseView.Builder(activity).setTarget(target).setContentText("Content").setDismissText("Next").setDelay(delay).useFadeAnimation().setFadeDuration(0).build(); }
+    @Test public void throwingShapeDrawReleasesOverlayAndSequenceWithoutProgress() {
+        MaterialShowcaseView showcase = view(0);
+        showcase.setShape(new uk.co.deanwild.materialshowcaseview.shape.CircleShape() {
+            @Override public void draw(android.graphics.Canvas canvas, android.graphics.Paint paint, int x, int y) {
+                throw new IllegalStateException("draw");
+            }
+        });
+        MaterialShowcaseSequence sequence = new MaterialShowcaseSequence(activity, "drawing-failure");
+        sequence.addSequenceItem(showcase); sequence.start(); layout(); idle(1);
+        try {
+            try { showcase.onDraw(new android.graphics.Canvas()); fail("Expected drawing failure"); }
+            catch (IllegalStateException expected) { assertEquals("draw", expected.getMessage()); }
+            assertNull("Drawing failures must release the overlay", showcase.getParent());
+            assertFalse(sequence.isRunning()); assertFalse(sequence.hasFired());
+        } finally { sequence.cancel(); }
+    }
+
+    @Test public void throwingTouchGeometryReleasesOverlayWithoutProgress() {
+        MaterialShowcaseView showcase = new MaterialShowcaseView.Builder(activity).setTarget(target)
+                .setTargetTouchable(true).singleUse("touch-geometry-failure").useFadeAnimation().setFadeDuration(0).build();
+        boolean[] broken = {false};
+        showcase.setTarget(new uk.co.deanwild.materialshowcaseview.target.ViewTarget(target) {
+            @Override public android.graphics.Rect getBounds() {
+                if (broken[0]) throw new IllegalStateException("touch geometry");
+                return super.getBounds();
+            }
+        });
+        showcase.show(activity); layout(); idle(1); broken[0] = true;
+        MotionEvent down = MotionEvent.obtain(0, 0, MotionEvent.ACTION_DOWN, 20, 20, 0);
+        try {
+            try { showcase.onTouch(showcase, down); fail("Expected geometry failure"); }
+            catch (IllegalStateException expected) { assertEquals("touch geometry", expected.getMessage()); }
+            assertNull("Touch failures must release the overlay", showcase.getParent());
+            assertFalse(showcase.hasFired());
+        } finally { down.recycle(); broken[0] = false; showcase.removeFromWindow(); }
+    }
+
+    private void settleTooltip() {
+        for (int i = 0; i < 4; i++) { idle(1); layout(); content.getViewTreeObserver().dispatchOnPreDraw(); }
+    }
+
+    @Test public void shapeMayRemoveItsPresentationWhileDrawing() {
+        MaterialShowcaseView showcase = view(0);
+        showcase.setShape(new uk.co.deanwild.materialshowcaseview.shape.CircleShape() {
+            @Override public void draw(android.graphics.Canvas canvas, android.graphics.Paint paint, int x, int y) {
+                showcase.removeFromWindow();
+            }
+        });
+        showcase.show(activity); layout(); idle(1);
+        showcase.onDraw(new android.graphics.Canvas());
+        assertNull(showcase.getParent());
+    }
+
+    @Test public void throwingTargetBoundsDuringPredrawReleasesOverlay() {
+        MaterialShowcaseView showcase = view(0); boolean[] broken = {false};
+        showcase.setTarget(new uk.co.deanwild.materialshowcaseview.target.ViewTarget(target) {
+            @Override public android.graphics.Rect getBounds() {
+                if (broken[0]) throw new IllegalStateException("target bounds");
+                return super.getBounds();
+            }
+        });
+        showcase.show(activity); layout(); idle(1); broken[0] = true;
+        try {
+            try { content.getViewTreeObserver().dispatchOnPreDraw(); fail("Expected target failure"); }
+            catch (IllegalStateException expected) { assertEquals("target bounds", expected.getMessage()); }
+            assertNull(showcase.getParent());
+        } finally { broken[0] = false; showcase.removeFromWindow(); }
+    }
+
+    @Test public void cancelledTooltipTrackingCannotAffectReplacement() {
+        ShowcaseTooltip tooltip = ShowcaseTooltip.build(activity).text("Tip");
+        tooltip.configureTarget(content, target);
+        ShowcaseTooltip.TooltipView bubble = tooltip.show(0); settleTooltip();
+        ViewTreeObserver.OnPreDrawListener stale = org.robolectric.util.ReflectionHelpers.getField(tooltip, "trackingLayout");
+        assertNotNull(stale); tooltip.cancel();
+        assertNull(org.robolectric.util.ReflectionHelpers.getField(tooltip, "trackingLayout"));
+        tooltip.show(0); settleTooltip();
+        try {
+            Object replacement = org.robolectric.util.ReflectionHelpers.getField(tooltip, "trackingLayout");
+            target.setVisibility(View.INVISIBLE); stale.onPreDraw();
+            assertSame(content, bubble.getParent());
+            assertSame(replacement, org.robolectric.util.ReflectionHelpers.getField(tooltip, "trackingLayout"));
+            content.getViewTreeObserver().dispatchOnPreDraw(); assertNull(bubble.getParent());
+        } finally { tooltip.cancel(); }
+    }
+
+    @Test public void visibleTooltipTracksTargetAndPlacementWithoutRepeatingEntrance() {
+        int[] entrances = {0};
+        ShowcaseTooltip tooltip = ShowcaseTooltip.build(activity).text("Tip").align(ShowcaseTooltip.ALIGN.START)
+                .animation(new ShowcaseTooltip.TooltipAnimation() {
+                    public void animateEnter(View view, android.animation.Animator.AnimatorListener listener) { entrances[0]++; }
+                    public void animateExit(View view, android.animation.Animator.AnimatorListener listener) { }
+                });
+        tooltip.configureTarget(content, target);
+        ShowcaseTooltip.TooltipView bubble = tooltip.show(0);
+        try {
+            settleTooltip(); float x = bubble.getX(), y = bubble.getY();
+            target.setTranslationX(40); target.setTranslationY(200);
+            content.getViewTreeObserver().dispatchOnPreDraw();
+            assertEquals(x + 40, bubble.getX(), 0f); assertEquals(y + 200, bubble.getY(), 0f);
+            tooltip.position(ShowcaseTooltip.Position.TOP); settleTooltip();
+            assertEquals(target.getY() - bubble.getHeight(), bubble.getY(), 0f);
+            assertEquals("Geometry updates must not replay the entrance", 1, entrances[0]);
+        } finally { tooltip.cancel(); }
+    }
+
+    @Test public void hiddenOrDetachedTargetReleasesVisibleTooltip() {
+        ShowcaseTooltip tooltip = ShowcaseTooltip.build(activity).text("Tip");
+        tooltip.configureTarget(content, target);
+        ShowcaseTooltip.TooltipView bubble = tooltip.show(0);
+        try {
+            settleTooltip(); assertNotNull(bubble.getParent());
+            target.setVisibility(View.INVISIBLE); content.getViewTreeObserver().dispatchOnPreDraw();
+            assertNull("Hidden targets must not retain their tooltip", bubble.getParent());
+            target.setVisibility(View.VISIBLE); tooltip.show(0); settleTooltip();
+            assertNotNull(bubble.getParent()); content.removeView(target);
+            content.getViewTreeObserver().dispatchOnPreDraw();
+            assertNull("Detached targets must release their tooltip", bubble.getParent());
+        } finally { tooltip.cancel(); }
+    }
+
+    @Test public void tooltipStaysInsideHorizontalWindowInsetsAsTargetMoves() {
+        content.removeView(target);
+        content = new FrameLayout(activity) {
+            @Override public void getWindowVisibleDisplayFrame(android.graphics.Rect bounds) {
+                super.getWindowVisibleDisplayFrame(bounds);
+                bounds.left = 40; bounds.right = 500;
+            }
+        };
+        content.addView(target, new FrameLayout.LayoutParams(200, 100));
+        activity.setContentView(content); layout(); target.setTranslationX(280);
+        ShowcaseTooltip tooltip = ShowcaseTooltip.build(activity).text("A tooltip near the navigation bar");
+        tooltip.configureTarget(content, target); ShowcaseTooltip.TooltipView bubble = tooltip.show(0);
+        try {
+            settleTooltip();
+            assertTrue("Tooltip extends behind the right navigation bar", bubble.getX() + bubble.getWidth() <= 500);
+            assertTrue(bubble.getX() >= 40);
+            target.setTranslationX(0); content.getViewTreeObserver().dispatchOnPreDraw();
+            assertTrue("Tooltip extends behind the left inset", bubble.getX() >= 40);
+            assertTrue(bubble.getX() + bubble.getWidth() <= 500);
+        } finally { tooltip.cancel(); }
+    }
+
     @Test public void globalResetRejectsWritersFromBeforeResetEvenAfterReload() {
         SharedPreferencesProgressStore first = new SharedPreferencesProgressStore(activity);
         SharedPreferencesProgressStore second = new SharedPreferencesProgressStore(activity);

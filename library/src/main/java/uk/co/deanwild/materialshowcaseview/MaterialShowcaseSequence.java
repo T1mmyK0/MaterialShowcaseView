@@ -45,8 +45,8 @@ public class MaterialShowcaseSequence implements IDetachedListener {
     public void cancel() {
         check(); generation++; running = false;
         MaterialShowcaseView view = current; current = null;
-        if (view != null) { view.setDetachedListener(null); view.removeShowcaseListener(displayListener); view.removeFromWindow(); }
-        displayListener = null;
+        IShowcaseListener oldListener = displayListener; displayListener = null;
+        if (view != null) { view.setDetachedListener(null); view.removeShowcaseListener(oldListener); view.removeFromWindow(); }
     }
     private void showNext() {
         if (!running) return;
@@ -62,7 +62,13 @@ public class MaterialShowcaseSequence implements IDetachedListener {
             public void onShowcaseDismissed(MaterialShowcaseView view) { }
         };
         current.addShowcaseListener(displayListener); current.setDetachedListener(this);
-        if (!current.show(mActivity)) cancel();
+        try { if (!current.show(mActivity)) cancel(); }
+        catch (RuntimeException error) {
+            if (generation == token) {
+                try { cancel(); } catch (RuntimeException cleanup) { if (cleanup != error) error.addSuppressed(cleanup); }
+            }
+            throw error;
+        }
     }
     @Override public void onShowcaseDetached(MaterialShowcaseView view, boolean wasDismissed, boolean wasSkipped) {
         if (!running || view != current) return;

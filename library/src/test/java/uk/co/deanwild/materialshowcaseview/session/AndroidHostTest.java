@@ -30,6 +30,22 @@ public class AndroidHostTest {
     void layout() { View decor=activity.getWindow().getDecorView();decor.measure(View.MeasureSpec.makeMeasureSpec(320,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(470,View.MeasureSpec.EXACTLY));decor.layout(0,0,320,470); }
     void idle() { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20)); }
     @After public void destroy() { controller.pause().stop().destroy(); }
+    @Test public void observationBeforeAttachmentReleasesTransferredFocusListener() {
+        FrameLayout pendingRoot = new FrameLayout(activity);
+        ViewTreeObserver windowTree = root.getViewTreeObserver();
+        java.util.List<?> before = org.robolectric.util.ReflectionHelpers.getField(windowTree, "mOnWindowFocusListeners");
+        int baseline = before == null ? 0 : before.size();
+        AndroidTutorialHost host = new AndroidTutorialHost(pendingRoot, id -> null);
+        Cancellation observation = host.observe(() -> { });
+        try {
+            root.addView(pendingRoot, new FrameLayout.LayoutParams(-1, -1)); layout();
+            java.util.List<?> attached = org.robolectric.util.ReflectionHelpers.getField(windowTree, "mOnWindowFocusListeners");
+            assertEquals(baseline + 1, attached.size());
+            observation.cancel();
+            assertEquals("Cancellation must remove focus listeners merged into the window tree", baseline, attached.size());
+        } finally { observation.cancel(); host.cancel(); root.removeView(pendingRoot); }
+    }
+
     @Test public void overlayRestoresAccessibilityAndFocusOnCancel() {
         target.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_YES);target.setFocusableInTouchMode(true);target.requestFocus();
         TutorialTheme theme=new TutorialTheme();theme.reducedMotion=true;

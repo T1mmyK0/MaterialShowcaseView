@@ -4,12 +4,17 @@ Validation performed on 2026-10-05 using the repository's Gradle 9.8.0 / AGP 9.4
 installed JetBrains JDK 25 and Android SDK 37.2. Android framework tests use Robolectric 4.17,
 APIs 28 and 30; deterministic engine tests use a virtual clock and deliberately stale callbacks.
 
-Final result: **188 tests passed, 0 failed, 0 skipped** (71 deterministic session tests,
-58 legacy Android regressions, 36 Android host/rendering/geometry tests, 5 lifecycle/Back/RecyclerView
+Final result: **253 tests passed, 0 failed, 0 skipped** (95 deterministic session tests,
+79 legacy Android regressions, 55 Android host/rendering/geometry tests, 6 lifecycle/Back/RecyclerView
 tests and 18 sample startup/policy-dialog tests). Lint reports **0 errors** across all modules:
 1 core dependency-version warning, 2 lifecycle dependency-version warnings, and 31 sample warnings.
 The sample APK and both release AARs build successfully. Gradle also reports deprecations for
 future Gradle 10, and Robolectric/Conscrypt emits a JDK native-access warning; neither failed checks.
+
+The completed [structured review matrix](REVIEW_MATRIX.md) records the ownership/callback audit,
+8-phase cancellation matrix, 144 content/tooltip layout configurations, confirmed repairs and
+unverified device cells. It added 55 test cases to the previous 198. The latest build log is
+`build/structured-final.log`; the dated review sections below preserve earlier evidence.
 
 Reproduce:
 
@@ -143,6 +148,21 @@ All **188 tests**, the three lint tasks, the sample debug APK and both release A
 The latest build log is `build/current-review-final.log`. This follow-up used automated Android
 regressions; it did not perform new emulator or TalkBack checks.
 
+The latest library audit added ten regressions covering:
+
+- Cleanup after custom shape drawing, touch geometry and pre-draw target failures, without
+  committing single-use or sequence progress; safe removal from inside a shape's draw callback.
+- Visible tooltips following moving targets and placement changes without repeating entrance
+  animations; release when a target disappears, and rejection of obsolete tracking callbacks.
+- Tooltip placement inside both horizontal window insets, including a right-side navigation bar.
+- Focus-listener cleanup after registration on an unattached root and transfer to its window tree.
+- Exactly one RecyclerView preparation completion when scrolling synchronously attaches the item.
+
+Seven regressions were reproduced before their respective fixes in `build/library-audit-before.log`,
+`build/library-audit-lifecycle-before.log` and `build/library-audit-insets-before.log`; the other three
+cover related cancellation and drawing paths. All **198 tests**, all three lint tasks, the sample
+debug APK and both release AAR builds pass. The final build log is `build/library-audit-final.log`.
+
 Build outputs:
 
 - `library/build/outputs/aar/library-release.aar`
@@ -151,6 +171,24 @@ Build outputs:
 
 ## Limits that remain
 
+- The structured review installed the final sample APK on a temporary read-only API 24 emulator.
+  Portrait and doubled-text landscape checks verified the legacy highlight, scrolling to Got it,
+  and actual dismissal. Rotation exposed a real window-teardown crash; it was reproduced in a
+  regression and repaired before repeating the device checks. RTL was applied through Android's
+  Developer options, then screenshots verified both tooltip steps, mirrored anchors, readable
+  enlarged toolbar text, and landscape navigation-bar clearance. Actual Next/Previous taps under
+  RTL and doubled text moved from step one to two and back, followed by landscape recreation.
+  Back then produced `CANCELLED / USER`. No AndroidRuntime, WindowManager or AiTutorial errors
+  were recorded in `structured-final-runtime-errors.log`; the temporary emulator was stopped.
+  Final screenshots/UI dumps use `build/device-review/structured-final-*`; legacy scrolling uses
+  `structured-legacy-controls.*`. The original crash is retained in `structured-crash.log`.
+- This audit inspected both tooltip placements on a temporary API 24 emulator. Rotation exposed
+  navigation-bar clipping in the second tooltip; after the fix and APK reinstall, its complete
+  text and arrow fit within the landscape viewport. Screenshots and UI dumps are under
+  `build/device-review/library-audit-*`, including `library-audit-tooltip-landscape-fixed.png`.
+  No AndroidRuntime or WindowManager errors were reported in `library-audit-runtime-errors.log`.
+  The read-only emulator was stopped after verification. Target motion and observer cleanup were
+  checked with automated regressions; this does not expand the modern-device or TalkBack coverage.
 - This review used a temporary API 24 emulator to inspect both tooltip placements and to rotate an
   open Gemini policy dialog. The recreated dialog remained visible and acceptance displayed the
   landscape tutorial with scrollable controls. No AndroidRuntime, WindowManager or AiTutorial errors
@@ -178,9 +216,9 @@ Build outputs:
 - Only an API 24 system image is installed. **Modern window-inset behavior has not been verified on
   a modern device/emulator**; the API 30 keyboard/cutout tests use framework simulation. TalkBack
   is not installed on the emulator, so actual spoken navigation and switch access remain unverified.
-  Predictive gestures on Android 13+, large-font RTL/landscape/split-screen visual QA, heap profiling
-  and API 12 runtime verification also remain outside this run. These tests do not establish that
-  full release matrix.
+  Predictive gestures on Android 13+, split-screen device QA, heap profiling and API 12 runtime
+  verification remain outside this run. Large-font RTL/landscape checks now cover the recorded
+  API 24 sample scenarios and APIs 28/30 framework matrix, not every device, locale or font.
 - The built-in target interaction mode supports existing click actions. It deliberately does not
   forward arbitrary editable/drag/multitouch gestures through the mask; use application-confirmed
   actions or nonmodal hints for those flows.

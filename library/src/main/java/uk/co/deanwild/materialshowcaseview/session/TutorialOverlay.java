@@ -35,7 +35,7 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
     private final View previousFocus;
     private final View previousAccessibilityFocus;
     private Animator animator;
-    private boolean closed, exiting, tap, panelGesture;
+    private boolean closed, exiting, tap, panelGesture, detaching;
     private View gestureTarget;
     private final Rect gestureBounds = new Rect();
     private final Rect gestureTargetBounds = new Rect();
@@ -285,21 +285,41 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         }); animator.start();
     }
     Cancellation hide(Runnable hidden) { exiting = true; tap = false; gestureTarget = null; animateAlpha(getAlpha(), 0, hidden); return () -> { if (animator != null) { animator.removeAllListeners(); animator.cancel(); } }; }
+    @Override protected void onDetachedFromWindow() {
+        detaching = true;
+        try {
+            if (!closed) callbacks.run(() -> {
+                Scope cleanup = new Scope();
+                cleanup.own(actions::close);
+                cleanup.own(this::cancel);
+                cleanup.cancel();
+            });
+        } finally { detaching = false; super.onDetachedFromWindow(); }
+    }
     @Override public void cancel() {
         if (closed) return; closed = true;
         boolean restoreInputFocus = step.interaction != Step.Interaction.HINT || hasFocus();
         boolean restoreSpokenFocus = step.interaction != Step.Interaction.HINT
                 || (Build.VERSION.SDK_INT >= 21 && accessibilityFocus(this) != null);
-        if (reveal != null) removeCallbacks(reveal); reveal = null;
-        if (animator != null) { animator.removeAllListeners(); animator.cancel(); animator = null; }
-        if (getParent() == root) root.removeView(this);
-        if (Build.VERSION.SDK_INT >= 16) for (Map.Entry<View, Integer> entry : accessibility.entrySet()) entry.getKey().setImportantForAccessibility(entry.getValue());
-        accessibility.clear();
-        for (Map.Entry<ViewGroup, Integer> entry : focusGroups.entrySet()) entry.getKey().setDescendantFocusability(entry.getValue());
-        for (Map.Entry<View, Boolean> entry : focusable.entrySet()) entry.getKey().setFocusable(entry.getValue());
-        focusGroups.clear(); focusable.clear();
-        if (restoreInputFocus && previousFocus != null && previousFocus.getWindowToken() != null) previousFocus.requestFocus();
-        if (restoreSpokenFocus) restoreAccessibilityFocus();
+        Scope cleanup = new Scope();
+        // Register in reverse execution order. One application View throwing during
+        // detachment/restoration must not prevent restoring the remaining background.
+        cleanup.own(() -> { if (restoreSpokenFocus) restoreAccessibilityFocus(); });
+        cleanup.own(() -> { if (restoreInputFocus && previousFocus != null && previousFocus.getWindowToken() != null) previousFocus.requestFocus(); });
+        for (Map.Entry<View, Boolean> entry : focusable.entrySet())
+            cleanup.own(() -> entry.getKey().setFocusable(entry.getValue()));
+        for (Map.Entry<ViewGroup, Integer> entry : focusGroups.entrySet())
+            cleanup.own(() -> entry.getKey().setDescendantFocusability(entry.getValue()));
+        if (Build.VERSION.SDK_INT >= 16) for (Map.Entry<View, Integer> entry : accessibility.entrySet())
+            cleanup.own(() -> entry.getKey().setImportantForAccessibility(entry.getValue()));
+        cleanup.own(() -> { if (!detaching && getParent() == root) root.removeView(this); });
+        cleanup.own(() -> setVisibility(GONE));
+        Animator ending = animator; animator = null;
+        cleanup.own(() -> { if (ending != null) { ending.removeAllListeners(); ending.cancel(); } });
+        Runnable pendingReveal = reveal; reveal = null;
+        cleanup.own(() -> { if (pendingReveal != null) removeCallbacks(pendingReveal); });
+        try { cleanup.cancel(); }
+        finally { accessibility.clear(); focusGroups.clear(); focusable.clear(); }
     }
     @android.annotation.SuppressLint("AccessibilityFocus") // Restore the user's prior focus, never move it during presentation.
     private void restoreAccessibilityFocus() {

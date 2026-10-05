@@ -38,6 +38,36 @@ public class LifecycleTutorialTest {
     void layout(){View view=activity.getWindow().getDecorView();view.measure(View.MeasureSpec.makeMeasureSpec(320,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(470,View.MeasureSpec.EXACTLY));view.layout(0,0,320,470);}
     void settle(){for(int i=0;i<6;i++){Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(20));layout();root.getViewTreeObserver().dispatchOnPreDraw();}}
     @After public void destroy(){coordinator.cancel();controller.pause().stop().destroy();}
+    @Test public void synchronousRecyclerLayoutCompletesPreparationOnlyOnce() {
+        root.removeAllViews();
+        RecyclerView list = new RecyclerView(activity) {
+            @Override public void scrollToPosition(int position) {
+                super.scrollToPosition(position);
+                LifecycleTutorialTest.this.layout();
+            }
+        };
+        list.setLayoutManager(new LinearLayoutManager(activity));
+        root.addView(list, new FrameLayout.LayoutParams(-1, -1));
+        RecyclerView.Adapter<RecyclerView.ViewHolder> adapter = new RecyclerView.Adapter<RecyclerView.ViewHolder>() {
+            public long getItemId(int position) { return position; }
+            public int getItemCount() { return 40; }
+            public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int type) {
+                TextView text = new TextView(activity); text.setLayoutParams(new RecyclerView.LayoutParams(-1, 100));
+                return new RecyclerView.ViewHolder(text) { };
+            }
+            public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) { }
+        };
+        adapter.setHasStableIds(true); list.setAdapter(adapter); layout();
+        RecyclerViewTarget item = new RecyclerViewTarget(list, 35, 0); assertNull(item.resolve());
+        Scope scope = new Scope(); int[] ready = {0};
+        try {
+            scope.own(item.prepare(scope, () -> ready[0]++));
+            assertNotNull(item.resolve());
+            assertEquals("Attachment during scroll must not complete preparation twice", 1, ready[0]);
+            settle(); adapter.notifyDataSetChanged(); settle(); assertEquals(1, ready[0]);
+        } finally { scope.cancel(); }
+    }
+
     @Test public void onlyResumedOwnerDisplaysAndDestroyedViewDisposes(){
         new LifecycleTutorial(owner,host,session);session.start();assertEquals(TutorialSession.State.PAUSED,session.getState());
         owner.state(Lifecycle.State.RESUMED);settle();assertTrue("ready="+host.ready()+" shown="+activity.getWindow().getDecorView().isShown()+" visibility="+activity.getWindow().getDecorView().getWindowVisibility()+" focus="+activity.getWindow().getDecorView().hasWindowFocus(),host.ready());assertEquals(TutorialSession.State.SHOWING,session.getState());

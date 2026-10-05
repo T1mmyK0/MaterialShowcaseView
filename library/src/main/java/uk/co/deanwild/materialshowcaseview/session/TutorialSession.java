@@ -314,7 +314,13 @@ public final class TutorialSession implements TutorialHost.Actions {
         public void previous() { invoke(TutorialSession.this::previous); }
         public void skipStep() { invoke(TutorialSession.this::skipStep); }
         public void skipTour() { invoke(TutorialSession.this::skipTour); }
-        public void close() { invoke(TutorialSession.this::close); }
+        public void close() {
+            scheduler.checkThread();
+            // Losing the actual Android view can cancel an entrance or exit as well
+            // as a displayed step. Navigation still requires SHOWING.
+            if (!disposed && run == owner && step() == originatingStep && current(token))
+                guarded(TutorialSession.this::close);
+        }
         public void actionCompleted() { invoke(() -> { if (!completed) { completed = true; advance(false); } }); }
         public void activateTarget(Runnable activation) {
             invoke(() -> {
