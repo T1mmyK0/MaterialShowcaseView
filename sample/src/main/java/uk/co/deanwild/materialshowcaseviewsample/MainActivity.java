@@ -16,6 +16,10 @@ public class MainActivity extends SampleActivity implements View.OnClickListener
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        Button lifecycleExample = new Button(this);
+        lifecycleExample.setText("Lifecycle AI tutorials");
+        lifecycleExample.setOnClickListener(v -> startActivity(new Intent(this, AiTutorialActivity.class)));
+        ((android.view.ViewGroup) findViewById(R.id.btn_simple_example).getParent()).addView(lifecycleExample, 0);
         Button button = findViewById(R.id.btn_simple_example);
         button.setOnClickListener(this);
         button = findViewById(R.id.btn_custom_example);

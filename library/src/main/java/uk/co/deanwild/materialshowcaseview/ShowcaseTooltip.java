@@ -12,7 +12,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.Point;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.graphics.Typeface;
@@ -28,6 +27,7 @@ import android.widget.FrameLayout;
 import android.widget.TextView;
 
 import java.util.Arrays;
+import uk.co.deanwild.materialshowcaseview.target.ViewTarget;
 
 /**
  * Base on original code by florentchampigny
@@ -36,14 +36,21 @@ import java.util.Arrays;
 
 public class ShowcaseTooltip {
 
+    private Runnable pending;
+    private ViewTreeObserver.OnPreDrawListener pendingLayout;
+    private ViewTreeObserver pendingTree;
+    private long generation;
     private View rootView;
     private View view;
     private TooltipView tooltip_view;
 
 
     private ShowcaseTooltip(Context context){
-        MyContext myContext = new MyContext(getActivityContext(context));
+        Activity activity = getActivityContext(context);
+        if (activity == null) throw new IllegalArgumentException("Tooltip requires an Activity context");
+        MyContext myContext = new MyContext(activity);
         this.tooltip_view = new TooltipView(myContext.getContext());
+        this.tooltip_view.detachedCleanup = this::cancelPending;
     }
 
     public static ShowcaseTooltip build(Context context) {
@@ -51,6 +58,7 @@ public class ShowcaseTooltip {
     }
 
     public void configureTarget(ViewGroup rootView, View view) {
+        cancel();
         this.rootView = rootView;
         this.view = view;
     }
@@ -76,7 +84,7 @@ public class ShowcaseTooltip {
     }
 
     public ShowcaseTooltip customView(int viewId) {
-        this.tooltip_view.setCustomView(((Activity) view.getContext()).findViewById(viewId));
+        this.tooltip_view.setCustomView(((Activity) tooltip_view.getContext()).findViewById(viewId));
         return this;
     }
 
@@ -106,55 +114,72 @@ public class ShowcaseTooltip {
     }
 
     public TooltipView show(final int margin) {
+        if (view == null) throw new IllegalStateException("Configure a tooltip target before showing it");
         final Context activityContext = tooltip_view.getContext();
         if (activityContext != null && activityContext instanceof Activity) {
             final ViewGroup decorView = rootView != null ?
                     (ViewGroup) rootView :
                     (ViewGroup) ((Activity) activityContext).getWindow().getDecorView();
 
-            view.postDelayed(new Runnable() {
+            cancel();
+            final long token = generation;
+            pending = new Runnable() {
                 @Override
                 public void run() {
-                    final Rect rect = new Rect();
-                    view.getGlobalVisibleRect(rect);
-
-                    final Rect rootGlobalRect = new Rect();
-                    final Point rootGlobalOffset = new Point();
-                    decorView.getGlobalVisibleRect(rootGlobalRect, rootGlobalOffset);
-
-                    int[] location = new int[2];
-                    view.getLocationOnScreen(location);
-                    rect.left = location[0];
-                    if (rootGlobalOffset != null) {
-                        rect.top -= rootGlobalOffset.y;
-                        rect.bottom -= rootGlobalOffset.y;
-                        rect.left -= rootGlobalOffset.x;
-                        rect.right -= rootGlobalOffset.x;
-                    }
-
-                    // fixes bottom mode
-                    rect.top -= margin;
-
-                    // fixes top mode
-                    rect.bottom += margin;
-
+                    if (token != generation || view == null || !new ViewTarget(view).isReady()
+                            || view.getWindowToken() != decorView.getWindowToken()) return;
                     decorView.addView(tooltip_view, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 
-                    tooltip_view.getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                    pendingLayout = new ViewTreeObserver.OnPreDrawListener() {
                         @Override
                         public boolean onPreDraw() {
-
-                            tooltip_view.setup(rect, decorView.getWidth());
-
-                            tooltip_view.getViewTreeObserver().removeOnPreDrawListener(this);
-
+                            if (pendingLayout != this || token != generation) return true;
+                            removePendingLayout();
+                            if (token == generation) {
+                                final Rect rect = new Rect();
+                                if (new ViewTarget(view).isReady() && view.getWindowToken() == decorView.getWindowToken()
+                                        && view.getGlobalVisibleRect(rect)) {
+                                    // Preserve clipping and convert all edges from window to parent coordinates.
+                                    int[] windowOrigin = new int[2], parentOrigin = new int[2];
+                                    view.getRootView().getLocationOnScreen(windowOrigin);
+                                    decorView.getLocationOnScreen(parentOrigin);
+                                    rect.offset(windowOrigin[0] - parentOrigin[0], windowOrigin[1] - parentOrigin[1]);
+                                    rect.top -= margin;
+                                    rect.bottom += margin;
+                                    tooltip_view.setup(rect, decorView.getWidth());
+                                } else cancel();
+                            }
                             return false;
                         }
-                    });
+                    };
+                    pendingTree = tooltip_view.getViewTreeObserver();
+                    pendingTree.addOnPreDrawListener(pendingLayout);
                 }
-            }, 100);
+            };
+            view.post(pending);
         }
         return tooltip_view;
+    }
+
+    private void removePendingLayout() {
+        if (pendingLayout != null && pendingTree != null && pendingTree.isAlive())
+            pendingTree.removeOnPreDrawListener(pendingLayout);
+        pendingLayout = null;
+        pendingTree = null;
+    }
+
+    private void cancelPending() {
+        generation++;
+        if (view != null && pending != null) view.removeCallbacks(pending);
+        pending = null;
+        removePendingLayout();
+    }
+
+    public void cancel() {
+        cancelPending();
+        tooltip_view.animate().setListener(null);
+        if (Build.VERSION.SDK_INT >= 14) tooltip_view.animate().cancel();
+        tooltip_view.removeNow();
     }
 
     public ShowcaseTooltip color(int color) {
@@ -177,6 +202,7 @@ public class ShowcaseTooltip {
         this.tooltip_view.paddingBottom = bottom;
         this.tooltip_view.paddingLeft = left;
         this.tooltip_view.paddingRight = right;
+        this.tooltip_view.setPosition(this.tooltip_view.position);
         return this;
     }
 
@@ -257,7 +283,14 @@ public class ShowcaseTooltip {
         void onDisplay(View view);
     }
 
-    public static class FadeTooltipAnimation implements TooltipAnimation {
+    /** Optional cancellation extension for custom tooltip animations. */
+    public interface CancellableTooltipAnimation extends TooltipAnimation { void cancel(View view); }
+
+    public static class FadeTooltipAnimation implements CancellableTooltipAnimation {
+        @Override public void cancel(View view) {
+            view.animate().setListener(null);
+            if (Build.VERSION.SDK_INT >= 14) view.animate().cancel();
+        }
 
         private long fadeDuration = 400;
 
@@ -281,6 +314,11 @@ public class ShowcaseTooltip {
     }
 
     public static class TooltipView extends FrameLayout {
+        private ViewTreeObserver.OnPreDrawListener setupListener;
+        private ViewTreeObserver setupTree;
+        private long animationGeneration;
+        private boolean removing;
+        private Runnable detachedCleanup;
 
         private static final int MARGIN_SCREEN_BORDER_TOOLTIP = 30;
         private int arrowHeight = 15;
@@ -326,10 +364,11 @@ public class ShowcaseTooltip {
             borderPaint = null;
 
             setLayerType(LAYER_TYPE_SOFTWARE, bubblePaint);
-
+            setPosition(position);
         }
 
         public void setCustomView(View customView) {
+            if (customView == null) throw new IllegalArgumentException("Missing tooltip content view");
             this.removeView(childView);
             this.childView = customView;
             addView(childView, ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -363,6 +402,7 @@ public class ShowcaseTooltip {
                     setPadding(paddingLeft + arrowHeight, paddingTop, paddingRight, paddingBottom);
                     break;
             }
+            bubblePath = drawBubble(new RectF(0, 0, getWidth(), getHeight()), corner, corner, corner, corner);
             postInvalidate();
         }
 
@@ -399,7 +439,7 @@ public class ShowcaseTooltip {
 
         public void setArrowHeight(int arrowHeight) {
             this.arrowHeight = arrowHeight;
-            postInvalidate();
+            setPosition(position);
         }
 
         public int getArrowWidth() {
@@ -482,15 +522,27 @@ public class ShowcaseTooltip {
         }
 
         protected void startEnterAnimation() {
-            tooltipAnimation.animateEnter(this, new AnimatorListenerAdapter() {
+            final long token = ++animationGeneration;
+            try { tooltipAnimation.animateEnter(this, new AnimatorListenerAdapter() {
+                private boolean delivered;
                 @Override
                 public void onAnimationEnd(Animator animation) {
                     super.onAnimationEnd(animation);
-                    if (listenerDisplay != null) {
-                        listenerDisplay.onDisplay(TooltipView.this);
+                    if (!delivered && token == animationGeneration && getParent() != null && listenerDisplay != null) {
+                        delivered = true;
+                        try { listenerDisplay.onDisplay(TooltipView.this); }
+                        catch (RuntimeException error) { throw presentationFailure(token, error); }
                     }
                 }
-            });
+            }); } catch (RuntimeException error) { throw presentationFailure(token, error); }
+        }
+
+        private RuntimeException presentationFailure(long token, RuntimeException error) {
+            if (token == animationGeneration) {
+                try { removeNow(); }
+                catch (RuntimeException cleanup) { if (cleanup != error) error.addSuppressed(cleanup); }
+            }
+            return error;
         }
 
         public void setupPosition(Rect rect) {
@@ -513,8 +565,9 @@ public class ShowcaseTooltip {
                 x = rect.left + getAlignOffset(getWidth(), rect.width());
             }
 
-            setTranslationX(x);
-            setTranslationY(y);
+            // The anchor is in parent coordinates; translation alone also adds layout padding/margins.
+            setX(x);
+            setY(y);
         }
 
         private int getAlignOffset(int myLength, int hisLength) {
@@ -610,53 +663,27 @@ public class ShowcaseTooltip {
         }
 
         public boolean adjustSize(Rect rect, int screenWidth) {
-
-            final Rect r = new Rect();
-            getGlobalVisibleRect(r);
-
             boolean changed = false;
             final ViewGroup.LayoutParams layoutParams = getLayoutParams();
-            if (position == Position.LEFT && getWidth() > rect.left) {
-                layoutParams.width = rect.left - MARGIN_SCREEN_BORDER_TOOLTIP - distanceWithView;
-                changed = true;
-            } else if (position == Position.RIGHT && rect.right + getWidth() > screenWidth) {
-                layoutParams.width = screenWidth - rect.right - MARGIN_SCREEN_BORDER_TOOLTIP - distanceWithView;
-                changed = true;
+            if (position == Position.LEFT || position == Position.RIGHT) {
+                int available = position == Position.LEFT ? rect.left : screenWidth - rect.right;
+                int maxWidth = Math.max(0, available - MARGIN_SCREEN_BORDER_TOOLTIP - distanceWithView);
+                if (getWidth() > maxWidth) {
+                    layoutParams.width = maxWidth;
+                    changed = true;
+                }
             } else if (position == Position.TOP || position == Position.BOTTOM) {
-                int adjustedLeft = rect.left;
-                int adjustedRight = rect.right;
-
-                if ((rect.centerX() + getWidth() / 2f) > screenWidth) {
-                    float diff = (rect.centerX() + getWidth() / 2f) - screenWidth;
-
-                    adjustedLeft -= diff;
-                    adjustedRight -= diff;
-
-                    setAlign(ALIGN.CENTER);
-                    changed = true;
-                } else if ((rect.centerX() - getWidth() / 2f) < 0) {
-                    float diff = -(rect.centerX() - getWidth() / 2f);
-
-                    adjustedLeft += diff;
-                    adjustedRight += diff;
-
-                    setAlign(ALIGN.CENTER);
+                int width = Math.min(getWidth(), Math.max(0, screenWidth));
+                if (width != getWidth()) {
+                    layoutParams.width = width;
                     changed = true;
                 }
-
-                if (adjustedLeft < 0) {
-                    adjustedLeft = 0;
-                }
-
-                if (adjustedRight > screenWidth) {
-                    adjustedRight = screenWidth;
-                }
-
-                rect.left = adjustedLeft;
-                rect.right = adjustedRight;
+                int left = rect.left + getAlignOffset(width, rect.width());
+                int clampedLeft = Math.max(0, Math.min(left, screenWidth - width));
+                // Offset only the placement copy; viewRect retains the true arrow anchor.
+                rect.offset(clampedLeft - left, 0);
             }
-
-            setLayoutParams(layoutParams);
+            if (changed) setLayoutParams(layoutParams);
             postInvalidate();
             return changed;
         }
@@ -668,6 +695,7 @@ public class ShowcaseTooltip {
         }
 
         public void setup(final Rect viewRect, int screenWidth) {
+            removeSetupListener();
             this.viewRect = new Rect(viewRect);
             final Rect myRect = new Rect(viewRect);
 
@@ -675,22 +703,51 @@ public class ShowcaseTooltip {
             if (!changed) {
                 onSetup(myRect);
             } else {
-                getViewTreeObserver().addOnPreDrawListener(new ViewTreeObserver.OnPreDrawListener() {
+                setupListener = new ViewTreeObserver.OnPreDrawListener() {
                     @Override
                     public boolean onPreDraw() {
-                        onSetup(myRect);
-                        getViewTreeObserver().removeOnPreDrawListener(this);
+                        if (setupListener != this) return true;
+                        removeSetupListener();
+                        if (getParent() != null) onSetup(myRect);
                         return false;
                     }
-                });
+                };
+                setupTree = getViewTreeObserver();
+                setupTree.addOnPreDrawListener(setupListener);
             }
         }
 
+        private void removeSetupListener() {
+            if (setupListener != null && setupTree != null && setupTree.isAlive())
+                setupTree.removeOnPreDrawListener(setupListener);
+            setupListener = null;
+            setupTree = null;
+        }
+
+        private void releasePresentation() {
+            animationGeneration++;
+            removeSetupListener();
+            if (detachedCleanup != null) detachedCleanup.run();
+            if (tooltipAnimation instanceof CancellableTooltipAnimation)
+                ((CancellableTooltipAnimation) tooltipAnimation).cancel(this);
+        }
+
         public void removeNow() {
-            if (getParent() != null) {
-                final ViewGroup parent = ((ViewGroup) getParent());
-                parent.removeView(TooltipView.this);
-            }
+            if (removing) return;
+            removing = true;
+            try {
+                try { releasePresentation(); }
+                finally { if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this); }
+            } finally { removing = false; }
+        }
+
+        @Override protected void onDetachedFromWindow() {
+            try {
+                if (!removing) {
+                    removing = true;
+                    try { releasePresentation(); } finally { removing = false; }
+                }
+            } finally { super.onDetachedFromWindow(); }
         }
 
         public void closeNow() {
@@ -753,4 +810,3 @@ public class ShowcaseTooltip {
         }
     }
 }
-

@@ -1,3 +1,19 @@
+# Lifecycle-aware fork
+
+New integrations should use `Tutorial`, `Step`, `TutorialSession` and `AndroidTutorialHost` from
+`uk.co.deanwild.materialshowcaseview.session`. Existing builders remain available.
+
+- [Session API and contracts](docs/SESSION_API.md)
+- [Java AI tutorial integration and migration](docs/AI_TUTORIAL_MIGRATION.md)
+- [Source audit and compatibility decisions](docs/AUDIT.md)
+- [Release notes](CHANGELOG.md)
+- [Review phases](docs/REVIEW_PHASES.md) and [validation/remaining limits](docs/VALIDATION.md)
+
+Run `./gradlew :library:testDebugUnitTest :sample:assembleDebug` to test and build. The sample menu's
+**Lifecycle AI tutorials** screen exercises changing providers, policy dialogs, long prompts and
+targets that can be hidden, disabled, moved or removed. The optional `:lifecycle` module supplies
+AndroidX lifecycle, Back and RecyclerView adapters without raising the core library's minimum SDK.
+
 *Looking for collaborators to help maintain this library, drop me a line at me@deanwild.co.uk if you want to help.*
 
 # MaterialShowcaseView

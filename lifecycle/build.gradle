@@ -1,0 +1,20 @@
+plugins { id 'com.android.library' }
+android {
+    testOptions { unitTests.includeAndroidResources = true }
+    enableKotlin = false
+    namespace = 'uk.co.deanwild.materialshowcaseview.lifecycle'
+    compileSdk { version = release(37) { minorApiLevel = 2 } }
+    defaultConfig { minSdk = 23 }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+}
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.17'
+    api project(':library')
+    api 'androidx.lifecycle:lifecycle-runtime:2.10.0'
+    api 'androidx.activity:activity:1.12.2'
+    api 'androidx.recyclerview:recyclerview:1.4.0'
+}

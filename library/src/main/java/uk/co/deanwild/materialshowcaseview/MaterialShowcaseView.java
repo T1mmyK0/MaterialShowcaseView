@@ -42,6 +42,7 @@ import uk.co.deanwild.materialshowcaseview.target.ViewTarget;
 /**
  * Helper class to show a sequence of showcase views.
  */
+@androidx.annotation.MainThread
 public class MaterialShowcaseView extends FrameLayout implements View.OnTouchListener, View.OnClickListener {
 
     public static final int DEFAULT_SHAPE_PADDING = 10;
@@ -88,6 +89,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     private PrefsManager mPrefsManager; // used to store state doe single use mode
     List<IShowcaseListener> mListeners; // external listeners who want to observe when we show and dismiss
     private UpdateOnGlobalLayout mLayoutListener;
+    private ViewTreeObserver.OnPreDrawListener mPendingShowListener;
     private IDetachedListener mDetachedListener;
     private boolean mTargetTouchable = false;
     private boolean mDismissOnTargetTouch = true;
@@ -96,6 +98,19 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
     private ShowcaseTooltip toolTip;
     private boolean toolTipShown;
+    private long generation;
+    private boolean active, hiding, notified, displayNotified, removing, committing;
+    private boolean tap;
+    private float downX, downY;
+    private Target touchTarget;
+    private final Rect touchTargetBounds = new Rect();
+    private final Rect touchVisibleBounds = new Rect();
+    private final int[] touchOrigin = new int[2];
+    private final Rect lastTargetBounds = new Rect();
+
+    private void checkMainThread() {
+        if (Looper.myLooper() != Looper.getMainLooper()) throw new IllegalStateException("Call on main thread");
+    }
 
     public MaterialShowcaseView(Context context) {
         super(context);
@@ -112,7 +127,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         init(context);
     }
 
-    @TargetApi(Build.VERSION_CODES.LOLLIPOP)
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.LOLLIPOP)
     public MaterialShowcaseView(Context context, AttributeSet attrs, int defStyleAttr, int defStyleRes) {
         super(context, attrs, defStyleAttr, defStyleRes);
         init(context);
@@ -127,6 +142,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         // make sure we add a global layout listener so we can adapt to changes
         mLayoutListener = new UpdateOnGlobalLayout();
         getViewTreeObserver().addOnGlobalLayoutListener(mLayoutListener);
+        getViewTreeObserver().addOnPreDrawListener(mLayoutListener);
 
         // consume touch events
         setOnTouchListener(this);
@@ -206,62 +222,109 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-
-        /**
-         * If we're being detached from the window without the mWasDismissed flag then we weren't purposefully dismissed
-         * Probably due to an orientation change or user backed out of activity.
-         * Ensure we reset the flag so the showcase display again.
-         */
-        if (!mWasDismissed && mSingleUse && mPrefsManager != null) {
-            mPrefsManager.resetShowcase();
-        }
-
-
-        notifyOnDismissed();
-
+        removeFromWindow();
+        if (mDetachedListener != null && !committing)
+            mDetachedListener.onShowcaseDetached(this, false, false);
     }
 
     @Override
     public boolean onTouch(View v, MotionEvent event) {
-        if (mDismissOnTouch) {
-            hide();
-        }
-        if (mTargetTouchable && mTarget.getBounds().contains((int) event.getX(), (int) event.getY())) {
-            if (mDismissOnTargetTouch) {
-                hide();
-            }
-            return false;
+        if (!active || hiding || getVisibility() != VISIBLE) { tap = false; touchTarget = null; return true; }
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN:
+                tap = true; downX = event.getX(); downY = event.getY(); touchTarget = null;
+                if (mTargetTouchable && targetCanBeClicked()) {
+                    getLocationInWindow(touchOrigin);
+                    touchTargetBounds.set(mTarget.getBounds());
+                    touchVisibleBounds.set(visibleTargetBounds());
+                    if (touchVisibleBounds.contains((int) downX + touchOrigin[0], (int) downY + touchOrigin[1])) touchTarget = mTarget;
+                }
+                break;
+            case MotionEvent.ACTION_POINTER_DOWN: case MotionEvent.ACTION_CANCEL: tap = false; touchTarget = null; break;
+            case MotionEvent.ACTION_MOVE:
+                if (Math.hypot(event.getX() - downX, event.getY() - downY) > android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop()) tap = false;
+                break;
+            case MotionEvent.ACTION_UP:
+                boolean clicked = tap && Math.hypot(event.getX() - downX, event.getY() - downY)
+                        <= android.view.ViewConfiguration.get(getContext()).getScaledTouchSlop();
+                tap = false;
+                Target pressed = touchTarget; touchTarget = null;
+                if (clicked && pressed != null) {
+                    getLocationInWindow(touchOrigin);
+                    if (pressed != mTarget || !targetCanBeClicked() || !touchTargetBounds.equals(mTarget.getBounds())
+                            || !touchVisibleBounds.equals(visibleTargetBounds())
+                            || !touchVisibleBounds.contains((int) event.getX() + touchOrigin[0], (int) event.getY() + touchOrigin[1])) break;
+                    long token = generation;
+                    try {
+                        if (mTarget instanceof ViewTarget) ((ViewTarget) mTarget).getView().performClick();
+                        if (generation == token && mDismissOnTargetTouch) hide();
+                    } catch (RuntimeException error) {
+                        if (generation == token) removeFromWindow();
+                        throw error;
+                    }
+                } else if (clicked && mDismissOnTouch) hide();
+                break;
         }
         return true;
     }
 
+    private Rect visibleTargetBounds() {
+        Rect bounds = mTarget.getBounds();
+        if (mTarget instanceof ViewTarget) {
+            View view = ((ViewTarget) mTarget).getView();
+            Rect visible = new Rect();
+            if (!view.getGlobalVisibleRect(visible)) { bounds.setEmpty(); return bounds; }
+            int[] origin = new int[2]; view.getRootView().getLocationInWindow(origin);
+            visible.offset(origin[0], origin[1]);
+            if (!bounds.intersect(visible)) bounds.setEmpty();
+        }
+        return bounds;
+    }
+
+    private boolean targetCanBeClicked() {
+        if (mTarget == null) return false;
+        if (!(mTarget instanceof ViewTarget)) return true;
+        ViewTarget target = (ViewTarget) mTarget;
+        View view = target.getView();
+        if (!target.isReady() || view.getWindowToken() != getWindowToken() || !view.isEnabled() || !view.isClickable()) return false;
+        while (true) {
+            if (view.getAlpha() <= 0) return false;
+            if (!(view.getParent() instanceof View)) return true;
+            view = (View) view.getParent();
+        }
+    }
+
 
     private void notifyOnDisplayed() {
-
-
+        if (displayNotified) return;
+        displayNotified = true;
+        final long token = generation;
         if (mListeners != null) {
-            for (IShowcaseListener listener : mListeners) {
+            for (IShowcaseListener listener : new ArrayList<>(mListeners)) {
+                if (!active || hiding || generation != token) break;
                 listener.onShowcaseDisplayed(this);
             }
         }
     }
 
     private void notifyOnDismissed() {
+        if (notified) return;
+        notified = true;
+        RuntimeException error = null;
         if (mListeners != null) {
-            for (IShowcaseListener listener : mListeners) {
-                listener.onShowcaseDismissed(this);
+            for (IShowcaseListener listener : new ArrayList<>(mListeners)) {
+                try { listener.onShowcaseDismissed(this); }
+                catch (RuntimeException failure) { if (error == null) error = failure; }
             }
-
-            mListeners.clear();
-            mListeners = null;
         }
 
         /**
          * internal listener used by sequence for storing progress within the sequence
          */
         if (mDetachedListener != null) {
-            mDetachedListener.onShowcaseDetached(this, mWasDismissed, mWasSkipped);
+            mDetachedListener.onShowcaseDetached(this, error == null && mWasDismissed, error == null && mWasSkipped);
         }
+        if (error != null) throw error;
     }
 
     /**
@@ -301,6 +364,16 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
      * @param target
      */
     public void setTarget(Target target) {
+        final long token = generation;
+        try { updateTarget(target); }
+        catch (RuntimeException error) {
+            // Geometry callbacks also run during layout and delayed presentation.
+            // Release an active overlay before propagating an application Shape/Target failure.
+            throw active ? presentationFailure(token, error) : error;
+        }
+    }
+
+    private void updateTarget(Target target) {
         mTarget = target;
 
         // update dismiss button state
@@ -320,6 +393,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
             // apply the target position
             Point targetPoint = mTarget.getPoint();
             Rect targetBounds = mTarget.getBounds();
+            lastTargetBounds.set(targetBounds);
             setPosition(targetPoint);
 
             // now figure out whether to put content above or below it
@@ -350,6 +424,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         }
 
         applyLayoutParams();
+        invalidate();
     }
 
     private void applyLayoutParams() {
@@ -362,6 +437,20 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
             int safeBottomMargin = Math.max(mContentBottomMargin,
                     Math.max(0, mSystemBarInsets.bottom - mBottomMargin));
             int safeTopMargin = Math.max(mContentTopMargin, mSystemBarInsets.top);
+            // A large target/custom shape may cover the entire window. Keep a bounded,
+            // scrollable panel available so the user can still reach its dismiss control.
+            int height = getHeight();
+            int insetBottom = Math.max(0, mSystemBarInsets.bottom - mBottomMargin);
+            int usableHeight = Math.max(0, height - mSystemBarInsets.top - insetBottom);
+            float density = getResources().getDisplayMetrics().density;
+            if (!mHasCustomGravity && height > 0
+                    && height - safeTopMargin - safeBottomMargin < Math.min(usableHeight, Math.round(144 * density))) {
+                int panelHeight = Math.min(usableHeight, Math.max(Math.round(48 * density), usableHeight / 2));
+                safeTopMargin = mSystemBarInsets.top;
+                safeBottomMargin = insetBottom;
+                if (mGravity == Gravity.BOTTOM) safeBottomMargin += usableHeight - panelHeight;
+                else safeTopMargin += usableHeight - panelHeight;
+            }
             if (contentLP.bottomMargin != safeBottomMargin) {
                 contentLP.bottomMargin = safeBottomMargin;
                 layoutParamsChanged = true;
@@ -398,7 +487,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         /**
          * Adjust tooltip gravity if needed
          */
-        if (toolTip != null) {
+        if (toolTip != null && active && mTarget != null && mShape != null) {
 
             if (!toolTipShown) {
                 toolTipShown = true;
@@ -451,7 +540,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
     private void setTitleText(CharSequence contentText) {
-        if (mTitleTextView != null && !contentText.equals("")) {
+        if (mTitleTextView != null && !TextUtils.isEmpty(contentText)) {
             mContentTextView.setAlpha(0.5F);
             mTitleTextView.setText(contentText);
         }
@@ -521,6 +610,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
     private void setShapePadding(int padding) {
         mShapePadding = padding;
+        if (mShape != null) mShape.setPadding(padding);
+        setTarget(mTarget);
+        invalidate();
     }
 
     private void setTooltipMargin(int margin) {
@@ -560,10 +652,14 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
     public void addShowcaseListener(IShowcaseListener showcaseListener) {
-        if (mListeners != null)
+        if (showcaseListener != null && !mListeners.contains(showcaseListener))
             mListeners.add(showcaseListener);
     }
 
+    public void removeShowcaseListener(IShowcaseListener listener) { mListeners.remove(listener); }
+
+    /** @deprecated Use removeShowcaseListener(IShowcaseListener). */
+    @Deprecated
     public void removeShowcaseListener(MaterialShowcaseSequence showcaseListener) {
 
         if ((mListeners != null) && mListeners.contains(showcaseListener)) {
@@ -577,6 +673,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
     public void setShape(Shape mShape) {
         this.mShape = mShape;
+        if (mShape != null) mShape.setPadding(mShapePadding);
+        setTarget(mTarget);
+        invalidate();
     }
 
     public void setAnimationFactory(IAnimationFactory animationFactory) {
@@ -594,7 +693,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
             setDelay(config.getDelay());
         }
 
-        if (config.getFadeDuration() > 0) {
+        if (config.getFadeDuration() >= 0) {
             setFadeDuration(config.getFadeDuration());
         }
 
@@ -644,17 +743,25 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
     public boolean hasFired() {
-        return mPrefsManager.hasFired();
+        return mPrefsManager != null && mPrefsManager.hasFired();
     }
 
     /**
      * REDRAW LISTENER - this ensures we redraw after activity finishes laying out
      */
-    private class UpdateOnGlobalLayout implements ViewTreeObserver.OnGlobalLayoutListener {
+    private class UpdateOnGlobalLayout implements ViewTreeObserver.OnGlobalLayoutListener, ViewTreeObserver.OnPreDrawListener {
 
         @Override
         public void onGlobalLayout() {
             setTarget(mTarget);
+        }
+
+        @Override public boolean onPreDraw() {
+            // Property animations and scrolling can move a target without a layout pass.
+            // Only refresh changed bounds so explicit showcase-position animations still work.
+            if (active && !hiding && mTarget instanceof ViewTarget
+                    && !lastTargetBounds.equals(mTarget.getBounds())) setTarget(mTarget);
+            return true;
         }
     }
 
@@ -694,7 +801,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
          * Set the title text shown on the ShowcaseView.
          */
         public Builder setTarget(View target) {
-            showcaseView.setTarget(new ViewTarget(target));
+            showcaseView.setTarget(target == null ? null : new ViewTarget(target));
             return this;
         }
 
@@ -897,6 +1004,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         }
 
         public MaterialShowcaseView build() {
+            if (showcaseView.mTarget == null) shapeType = NO_SHAPE;
             if (showcaseView.mShape == null) {
                 switch (shapeType) {
                     case RECTANGLE_SHAPE: {
@@ -945,43 +1053,78 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
     public void removeFromWindow() {
-        if (getParent() != null && getParent() instanceof ViewGroup) {
-            ((ViewGroup) getParent()).removeView(this);
-        }
-
-        if (mBitmap != null) {
-            mBitmap.recycle();
-            mBitmap = null;
-        }
-
-        mEraser = null;
-        mAnimationFactory = null;
-        mCanvas = null;
-        mHandler = null;
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-            getViewTreeObserver().removeOnGlobalLayoutListener(mLayoutListener);
-        } else {
-            getViewTreeObserver().removeGlobalOnLayoutListener(mLayoutListener);
+        checkMainThread();
+        if (removing) return;
+        removing = true;
+        if (!committing) mWasDismissed = mWasSkipped = false;
+        generation++; active = false; mShouldRender = false; tap = false; touchTarget = null;
+        removePendingShowListener();
+        if (mHandler != null) mHandler.removeCallbacksAndMessages(null);
+        // Detachment replaces this view's tree observer. Unregister from the window first.
+        ViewTreeObserver tree = getViewTreeObserver();
+        if (mLayoutListener != null && tree.isAlive()) {
+            tree.removeGlobalOnLayoutListener(mLayoutListener);
+            tree.removeOnPreDrawListener(mLayoutListener);
         }
         mLayoutListener = null;
+        RuntimeException failure = null;
+        try {
+            failure = cleanup(failure, () -> {
+                if (mAnimationFactory instanceof CancellableAnimationFactory)
+                    ((CancellableAnimationFactory) mAnimationFactory).cancel(this);
+            });
+            failure = cleanup(failure, () -> { if (Build.VERSION.SDK_INT >= 14) animate().cancel(); });
+            failure = cleanup(failure, () -> { if (toolTip != null) toolTip.cancel(); });
+            failure = cleanup(failure, () -> {
+                if (getParent() instanceof ViewGroup) ((ViewGroup) getParent()).removeView(this);
+            });
+        } finally {
+            if (mBitmap != null) { mBitmap.recycle(); mBitmap = null; }
+            mEraser = null; mCanvas = null; mHandler = null; removing = false;
+        }
+        if (failure != null) throw failure;
+    }
 
-        if (mPrefsManager != null)
-            mPrefsManager.close();
+    private static RuntimeException cleanup(RuntimeException failure, Runnable action) {
+        try { action.run(); }
+        catch (RuntimeException error) {
+            if (failure == null) return error;
+            if (failure != error) failure.addSuppressed(error);
+        }
+        return failure;
+    }
 
-        mPrefsManager = null;
+    private void removePendingShowListener() {
+        if (mPendingShowListener != null && getViewTreeObserver().isAlive())
+            getViewTreeObserver().removeOnPreDrawListener(mPendingShowListener);
+        mPendingShowListener = null;
+    }
 
-
+    private boolean targetBelongsToWindow(View windowRoot) {
+        if (!(mTarget instanceof ViewTarget)) return true;
+        View view = ((ViewTarget) mTarget).getView();
+        while (true) {
+            if (view.getVisibility() != VISIBLE || view.getAlpha() <= 0) return false;
+            if (view == windowRoot) return true;
+            if (!(view.getParent() instanceof View)) return false;
+            view = (View) view.getParent();
+        }
     }
 
 
     /**
-     * Reveal the showcaseview. Returns a boolean telling us whether we actually did show anything
+     * Request presentation after the configured delay and first layout. Returns whether the request was accepted.
      *
      * @param activity
      * @return
      */
     public boolean show(final Activity activity) {
+        checkMainThread();
+        if (active || removing || activity.isFinishing()
+                || (Build.VERSION.SDK_INT >= 17 && activity.isDestroyed())) return false;
+        if (toolTip != null && !(mTarget instanceof ViewTarget)) {
+            throw new IllegalArgumentException("The target must be of type: " + ViewTarget.class.getCanonicalName());
+        }
 
         /**
          * if we're in single use mode and have already shot our bolt then do nothing
@@ -989,9 +1132,19 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         if (mSingleUse) {
             if (mPrefsManager.hasFired()) {
                 return false;
-            } else {
-                mPrefsManager.setFired();
             }
+        }
+
+        // onCreate callers have a valid hierarchy before attachment/measurement. Validate
+        // ownership now and defer geometry checks until the first layout and requested delay.
+        if (!targetBelongsToWindow(activity.getWindow().getDecorView())) return false;
+        active = true; hiding = false; notified = false; displayNotified = false; toolTipShown = false;
+        mWasDismissed = mWasSkipped = false;
+        final long token = ++generation;
+        setVisibility(INVISIBLE); setAlpha(1);
+        if (mLayoutListener == null) {
+            mLayoutListener = new UpdateOnGlobalLayout(); getViewTreeObserver().addOnGlobalLayoutListener(mLayoutListener);
+            getViewTreeObserver().addOnPreDrawListener(mLayoutListener);
         }
 
         ((ViewGroup) activity.getWindow().getDecorView()).addView(this);
@@ -1004,10 +1157,6 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
         if (toolTip != null) {
 
-            if (!(mTarget instanceof ViewTarget)) {
-                throw new RuntimeException("The target must be of type: " + ViewTarget.class.getCanonicalName());
-            }
-
             ViewTarget viewTarget = (ViewTarget) mTarget;
 
             toolTip.configureTarget(this, viewTarget.getView());
@@ -1019,6 +1168,17 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         mHandler.postDelayed(new Runnable() {
             @Override
             public void run() {
+                if (!active || hiding || generation != token) return;
+                if (getWidth() <= 0 || getHeight() <= 0) {
+                    removePendingShowListener();
+                    mPendingShowListener = () -> {
+                        removePendingShowListener();
+                        run();
+                        return true;
+                    };
+                    getViewTreeObserver().addOnPreDrawListener(mPendingShowListener);
+                    return;
+                }
                 boolean attached;
                 // taken from https://android.googlesource.com/platform/frameworks/support/+/refs/heads/androidx-master-dev/core/src/main/java/androidx/core/view/ViewCompat.java#3310
                 if (Build.VERSION.SDK_INT >= 19) {
@@ -1026,7 +1186,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
                 } else {
                     attached = getWindowToken() != null;
                 }
-                if (attached && mTarget != null) {
+                if (!attached || !targetBelongsToWindow(activity.getWindow().getDecorView())
+                        || (mTarget instanceof ViewTarget && !((ViewTarget) mTarget).isReady())) { removeFromWindow(); return; }
+                if (mTarget != null) {
                     setTarget(mTarget);
                 }
                 if (mShouldAnimate && attached) {
@@ -1045,6 +1207,9 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
 
 
     public void hide() {
+        checkMainThread();
+        if (!active || hiding) return;
+        hiding = true;
 
         /**
          * This flag is used to indicate to onDetachedFromWindow that the showcase view was dismissed purposefully (by the user or programmatically)
@@ -1054,12 +1219,15 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         if (mShouldAnimate) {
             animateOut();
         } else {
-            removeFromWindow();
+            finishDismissal();
         }
     }
 
 
     public void skip() {
+        checkMainThread();
+        if (!active || hiding) return;
+        hiding = true;
 
         /**
          * This flag is used to indicate to onDetachedFromWindow that the showcase view was skipped purposefully (by the user or programmatically)
@@ -1069,37 +1237,69 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         if (mShouldAnimate) {
             animateOut();
         } else {
-            removeFromWindow();
+            finishDismissal();
         }
     }
 
     public void fadeIn() {
+        final long token = generation;
         setVisibility(INVISIBLE);
-        mAnimationFactory.animateInView(this, mTarget.getPoint(), mFadeDurationInMillis,
-                new IAnimationFactory.AnimationStartListener() {
-                    @Override
-                    public void onAnimationStart() {
-                        setVisibility(View.VISIBLE);
-                        notifyOnDisplayed();
+        try {
+            mAnimationFactory.animateInView(this, mTarget == null ? new Point(getWidth()/2, getHeight()/2) : mTarget.getPoint(), mFadeDurationInMillis,
+                    new IAnimationFactory.AnimationStartListener() {
+                        @Override
+                        public void onAnimationStart() {
+                            if (!active || generation != token || hiding) return;
+                            setVisibility(View.VISIBLE);
+                            try { notifyOnDisplayed(); }
+                            catch (RuntimeException error) { throw presentationFailure(token, error); }
+                        }
                     }
-                }
-        );
+            );
+        } catch (RuntimeException error) { throw presentationFailure(token, error); }
+    }
+
+    private RuntimeException presentationFailure(long token, RuntimeException error) {
+        // Application callbacks may have started another presentation before throwing.
+        return generation == token ? cleanup(error, this::removeFromWindow) : error;
     }
 
     public void animateOut() {
+        final long token = generation;
 
         if (mAnimationFactory == null || mTarget == null) {
-            removeFromWindow();
+            finishDismissal();
             return;
         }
 
-        mAnimationFactory.animateOutView(this, mTarget.getPoint(), mFadeDurationInMillis, new IAnimationFactory.AnimationEndListener() {
-            @Override
-            public void onAnimationEnd() {
-                setVisibility(INVISIBLE);
-                removeFromWindow();
+        try {
+            mAnimationFactory.animateOutView(this, mTarget.getPoint(), mFadeDurationInMillis, new IAnimationFactory.AnimationEndListener() {
+                @Override
+                public void onAnimationEnd() {
+                    if (!active || generation != token) return;
+                    setVisibility(INVISIBLE);
+                    finishDismissal();
+                }
+            });
+        } catch (RuntimeException error) { throw presentationFailure(token, error); }
+    }
+
+    private void finishDismissal() {
+        committing = true;
+        try {
+            try { removeFromWindow(); }
+            catch (RuntimeException error) {
+                mWasDismissed = mWasSkipped = false;
+                // Intentional removal suppresses the detach callback. On cleanup failure,
+                // release sequence ownership explicitly without committing its progress.
+                throw cleanup(error, () -> {
+                    if (mDetachedListener != null) mDetachedListener.onShowcaseDetached(this, false, false);
+                });
             }
-        });
+            if (mSingleUse && mPrefsManager != null) mPrefsManager.setFired();
+            notifyOnDismissed();
+        }
+        finally { committing = false; }
     }
 
     public void resetSingleUse() {
@@ -1126,7 +1326,7 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
     }
 
 
-    @TargetApi(Build.VERSION_CODES.KITKAT_WATCH)
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.KITKAT_WATCH)
     @Override
     public WindowInsets onApplyWindowInsets(WindowInsets insets) {
         updateSystemBarInsets(insets);
@@ -1138,11 +1338,11 @@ public class MaterialShowcaseView extends FrameLayout implements View.OnTouchLis
         return insets;
     }
 
-    @TargetApi(Build.VERSION_CODES.KITKAT_WATCH)
+    @androidx.annotation.RequiresApi(Build.VERSION_CODES.KITKAT_WATCH)
     private void updateSystemBarInsets(WindowInsets insets) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             android.graphics.Insets bars = insets.getInsets(
-                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout());
+                    WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout() | WindowInsets.Type.ime());
             mSystemBarInsets.set(bars.left, bars.top, bars.right, bars.bottom);
             mNavigationBarBottomInset = insets.getInsets(WindowInsets.Type.navigationBars()).bottom;
         } else {

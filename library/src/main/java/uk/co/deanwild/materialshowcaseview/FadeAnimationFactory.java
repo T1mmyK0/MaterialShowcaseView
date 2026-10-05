@@ -11,8 +11,11 @@ import android.view.ViewAnimationUtils;
 import android.view.animation.AccelerateDecelerateInterpolator;
 
 
-public class FadeAnimationFactory implements IAnimationFactory{
+public class FadeAnimationFactory implements CancellableAnimationFactory{
 
+    private final AnimationRegistry animations = new AnimationRegistry();
+    private final AnimationRegistry movements = new AnimationRegistry();
+    @Override public void cancel(View view) { animations.cancel(view); movements.cancel(view); }
     private static final String ALPHA = "alpha";
     private static final float INVISIBLE = 0f;
     private static final float VISIBLE = 1f;
@@ -25,7 +28,9 @@ public class FadeAnimationFactory implements IAnimationFactory{
 
     @Override
     public void animateInView(View target, Point point, long duration, final AnimationStartListener listener) {
-        if (!isAttachedToWindow(target)) {
+        animations.cancel(target);
+        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !isAttachedToWindow(target)) {
+            target.setAlpha(VISIBLE);
             listener.onAnimationStart();
             return;
         }
@@ -48,12 +53,14 @@ public class FadeAnimationFactory implements IAnimationFactory{
             public void onAnimationRepeat(Animator animator) {
             }
         });
-        oa.start();
+        animations.start(target, oa);
     }
 
     @Override
     public void animateOutView(View target, Point point, long duration, final AnimationEndListener listener) {
-        if (!isAttachedToWindow(target)) {
+        animations.cancel(target);
+        if (duration <= 0 || (Build.VERSION.SDK_INT >= 26 && !android.animation.ValueAnimator.areAnimatorsEnabled()) || !isAttachedToWindow(target)) {
+            target.setAlpha(INVISIBLE);
             listener.onAnimationEnd();
             return;
         }
@@ -76,7 +83,7 @@ public class FadeAnimationFactory implements IAnimationFactory{
             public void onAnimationRepeat(Animator animator) {
             }
         });
-        oa.start();
+        animations.start(target, oa);
     }
 
     private boolean isAttachedToWindow(View target) {
@@ -93,6 +100,7 @@ public class FadeAnimationFactory implements IAnimationFactory{
         ObjectAnimator yAnimator = ObjectAnimator.ofInt(showcaseView, "showcaseY", point.y);
         set.playTogether(xAnimator, yAnimator);
         set.setInterpolator(interpolator);
-        set.start();
+        movements.cancel(showcaseView);
+        movements.start(showcaseView, set);
     }
 }

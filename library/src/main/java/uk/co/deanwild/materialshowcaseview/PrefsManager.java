@@ -16,7 +16,7 @@ public class PrefsManager {
     private Context context;
 
     public PrefsManager(Context context, String showcaseID) {
-        this.context = context;
+        this.context = context.getApplicationContext();
         this.showcaseID = showcaseID;
     }
 
@@ -37,9 +37,10 @@ public class PrefsManager {
      * METHODS FOR SHOWCASE SEQUENCES
      */
     int getSequenceStatus() {
-        return context
+        try { return context
                 .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
                 .getInt(STATUS + showcaseID, SEQUENCE_NEVER_STARTED);
+        } catch (ClassCastException error) { return SEQUENCE_NEVER_STARTED; }
 
     }
 
@@ -59,8 +60,7 @@ public class PrefsManager {
     }
 
     public static void resetAll(Context context) {
-        SharedPreferences internal = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
-        internal.edit().clear().apply();
+        new uk.co.deanwild.materialshowcaseview.session.SharedPreferencesProgressStore(context).resetAll();
     }
 
     public void close() {
