@@ -3,7 +3,11 @@ package uk.co.deanwild.materialshowcaseview.session;
 /** Immutable, view-free step definition. Application predicates are evaluated when reached. */
 public final class Step {
     public enum Unavailable { WAIT, PAUSE, CANCEL, SKIP_OPTIONAL, FAIL }
-    public enum Interaction { NEXT, BACKGROUND_TAP, TARGET_ACTION, APPLICATION_ACTION, HINT }
+    public enum Interaction {
+        NEXT, BACKGROUND_TAP, TARGET_ACTION, APPLICATION_ACTION, HINT,
+        /** Invoke the primary target's click action, then advance automatically. */
+        TARGET_TAP
+    }
     public enum Timeout { PAUSE, CANCEL, SKIP_OPTIONAL, FAIL }
     public interface Condition { boolean test(); }
     public interface Branch { String next(); }
@@ -53,6 +57,11 @@ public final class Step {
         public Builder delay(long value) { if (value < 0) throw new IllegalArgumentException("delay"); delay = value; return this; }
         public Builder timeout(long value) { if (value <= 0) throw new IllegalArgumentException("timeout"); timeout = value; return this; }
         public Builder onTimeout(Timeout value) { if (value == null) throw new IllegalArgumentException("timeout policy"); timeoutPolicy = value; return this; }
-        public Step build() { if (condition == null || unavailable == null || interaction == null) throw new IllegalArgumentException("null option"); return new Step(this); }
+        public Step build() {
+            if (condition == null || unavailable == null || interaction == null) throw new IllegalArgumentException("null option");
+            if (interaction == Interaction.TARGET_TAP && (targetId == null || targetId.isEmpty()))
+                throw new IllegalArgumentException("TARGET_TAP requires a target ID");
+            return new Step(this);
+        }
     }
 }

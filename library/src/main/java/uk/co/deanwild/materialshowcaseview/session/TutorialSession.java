@@ -284,10 +284,10 @@ public final class TutorialSession implements TutorialHost.Actions {
     @Override public void close() { cancel(Reason.USER); }
     @Override public void next() {
         check(); if (state != State.SHOWING || step().interaction == Step.Interaction.APPLICATION_ACTION
-                || step().interaction == Step.Interaction.TARGET_ACTION) return;
+                || step().interaction == Step.Interaction.TARGET_ACTION || step().interaction == Step.Interaction.TARGET_TAP) return;
         advance(false);
     }
-    @Override public void actionCompleted() { check(); if (state == State.SHOWING) advance(false); }
+    @Override public void actionCompleted() { check(); if (state == State.SHOWING && step().interaction != Step.Interaction.TARGET_TAP) advance(false); }
     /** Capture while SHOWING, then pass this one-shot handle to asynchronous application work.
      * Unlike actionCompleted(), it cannot act on a later step or resumed presentation. */
     public Runnable completionHandle() {
@@ -303,7 +303,7 @@ public final class TutorialSession implements TutorialHost.Actions {
     private final class PresentationActions implements TutorialHost.Actions {
         private final long owner, token;
         private final Step originatingStep;
-        private boolean completed;
+        private boolean completed, activatingTarget;
         PresentationActions(long owner, long token, Step step) { this.owner = owner; this.token = token; originatingStep = step; }
         private boolean showing() { return !disposed && run == owner && step() == originatingStep && current(token, State.SHOWING); }
         private void invoke(Runnable action) {
@@ -321,20 +321,36 @@ public final class TutorialSession implements TutorialHost.Actions {
             if (!disposed && run == owner && step() == originatingStep && current(token))
                 guarded(TutorialSession.this::close);
         }
-        public void actionCompleted() { invoke(() -> { if (!completed) { completed = true; advance(false); } }); }
+        public void actionCompleted() { invoke(() -> {
+            if (!completed && originatingStep.interaction != Step.Interaction.TARGET_TAP) { completed = true; advance(false); }
+        }); }
         public void activateTarget(Runnable activation) {
             invoke(() -> {
-                if (originatingStep.interaction != Step.Interaction.TARGET_ACTION) return;
-                if (!passGate(token) || !validate(originatingStep, true, token)) return;
-                if (showing()) activation.run();
+                if (activatingTarget || originatingStep.interaction != Step.Interaction.TARGET_ACTION) return;
+                activatingTarget = true;
+                try {
+                    if (!passGate(token) || !validate(originatingStep, true, token)) return;
+                    if (showing()) activation.run();
+                } finally { activatingTarget = false; }
+            });
+        }
+        public void targetTapped(java.util.function.BooleanSupplier activation) {
+            invoke(() -> {
+                if (activatingTarget || originatingStep.interaction != Step.Interaction.TARGET_TAP) return;
+                activatingTarget = true;
+                try { advance(false, Objects.requireNonNull(activation)); } finally { activatingTarget = false; }
             });
         }
     }
-    @Override public void skipStep() { check(); if (state == State.SHOWING) advance(true); }
+    @Override public void skipStep() { check(); if (state == State.SHOWING && step().interaction != Step.Interaction.TARGET_TAP) advance(true); }
     private void advance(boolean skip) {
+        advance(skip, null);
+    }
+    private void advance(boolean skip, java.util.function.BooleanSupplier targetActivation) {
         guarded(() -> {
             long token = generation;
             if (!passGate(token) || !validate(step(), true, token)) return;
+            if (targetActivation != null && (!targetActivation.getAsBoolean() || !current(token, State.SHOWING))) return;
             change(State.HIDING, Reason.NONE);
             if (!current(token, State.HIDING)) return;
             Scope resources = phase;

@@ -162,12 +162,29 @@ preparation phase to repair it. All post-preparation and presentation checks rem
 
 The built-in reveal requests a padded rectangle through scrolling ancestors, including ScrollView
 and NestedScrollView, then waits for stable geometry. `setAlignment` supports nearest, center,
-start and end; custom containers can implement `RevealStrategy`. Oversized targets use the usable
-clipped viewport as the required visible extent instead of waiting for an impossible full fit.
+start and end; custom containers can implement `RevealStrategy`. On an axis where a target exceeds
+the usable clipped viewport, at least half that viewport must be visible. This tolerates reveal
+padding without waiting for an impossible full fit; ordinary targets still need to fit fully.
+If the highlighted region leaves too little room for the tutorial controls, the overlay temporarily
+omits its holes while preserving the configured mask color and transparency. Normal highlights return when the
+geometry permits them. Target-action steps retain their accessible activation button in this fallback.
 Target and ancestor scaling is included in screen-space bounds. Reveal, validation and panel
 placement share the usable viewport, including keyboard, system-bar and cutout insets. The app
 must still resize/inset its scrolling content for the keyboard (as the sample does), or use
 preparation to dismiss the keyboard; the host cannot create extra scroll range in application content.
+
+The second `setAlignment` argument is the scroll margin in **pixels**, measured inside the usable
+viewport after keyboard/system insets. Convert dp before passing it:
+
+```java
+int marginPx = Math.round(24 * context.getResources().getDisplayMetrics().density);
+host.setAlignment(AndroidTutorialHost.Alignment.NEAREST, marginPx);
+```
+
+Use `START`, `CENTER` or `END` to choose a specific vertical alignment instead of the nearest edge.
+Margins are limited by the container's scroll range. To leave space after the final item, add bottom
+padding or a spacer to the app's scroll content. Scroll margins are independent of `TutorialTheme.paddingDp`,
+which controls the showcase's content/highlight spacing.
 
 For RecyclerView use `RecyclerViewTarget` in the adapter: it resolves by stable item ID on each
 call, observes item/data changes and scrolls to the current adapter position. Use
@@ -200,13 +217,40 @@ on a window. There is no static Activity registry.
 
 ## Presentation and extensions
 
-`NEXT` uses explicit controls; `BACKGROUND_TAP` advances only on a completed single-pointer tap;
+`NEXT` uses explicit controls; `BACKGROUND_TAP` advances on a completed single-pointer tap,
+keyboard activation or an accessibility click, including when all visible controls are omitted;
 `TARGET_ACTION` invokes the existing target click handler on a completed highlighted tap or an
 accessible button; `APPLICATION_ACTION` waits for application confirmation; `HINT` allows background
 interaction and preserves background input focus. Closing a hint also preserves focus changes made
 in the application while it was visible. Target action does not automatically advance: the app confirms successful work.
 Application click/touch listeners are never replaced. Target-action mode supports click actions,
 not arbitrary text editing/drag gestures through the mask.
+
+Use `TARGET_TAP` to invoke the primary highlighted target's normal click action and then advance
+automatically. It requires a target ID and an enabled, clickable target:
+
+```java
+Step.builder("explain_prompt")
+    .target("prompt")
+    .content("Your prompt", "Tap the highlighted prompt to continue.")
+    .interaction(Step.Interaction.TARGET_TAP)
+    .build();
+```
+
+Background taps, informational additional highlights, drags and cancelled/multi-pointer gestures
+do not advance. Next and Skip step controls (including other buttons mapped to those actions) are
+omitted; `next()`, `skipStep()` and application completion calls cannot bypass this interaction.
+Previous, Skip tour and Close remain available when configured. Unavailable/timeout policies still
+apply when the target cannot be shown. Keyboard and accessibility users activate an invisible
+control positioned over the primary highlight, with the localizable `showcase_target_tap` label.
+For oversized targets, this mode retains a tappable highlighted portion beside the scrollable copy
+instead of suppressing the entire hole. The target must remain valid and unchanged throughout a tap;
+stale controls cannot advance a resumed or subsequent presentation. The app's click listener is
+preserved and invoked once. A click that cancels, pauses or replaces the presentation does not
+advance a different presentation, and a throwing click handler follows the session error policy.
+Use `TARGET_ACTION` instead when the action is asynchronous and the app must explicitly confirm
+completion before advancing.
+
 Each presentation receives its own guarded `Actions`. A stale action cannot affect another step,
 run or provider. Touch and accessible activation both recheck current eligibility, window membership,
 visibility, usable geometry, enabled state and clickability. Exit animations reject further activation;
@@ -245,13 +289,41 @@ Overlapping regions combine into one cutout. Legacy custom shapes remain availab
 
 `TutorialTheme` controls colors, text size, spacing, navigation labels and animation duration;
 the default modal presentation preserves the original showcase's blue translucent mask,
-transparent content background, regular white title/body text and flat text actions. Explanations
-sit next to the highlighted target. Navigation and secondary actions use compact rows that stack
-when the available width cannot fit their labels; every action retains native button semantics and
+transparent content background and white text. The Refined Spotlight typography uses a medium-weight
+title, softer body copy and a compact progress label. The default footer groups a Skip text button
+immediately before a filled Next/target-action pill at the trailing edge. Skip exits the tour;
+application-action steps show Skip while waiting for the application. Previous, Skip step and Close
+are hidden by default. Enable `showPrevious` to place Previous at the leading edge of the main row;
+`showSkipStep` and `showClose` add text buttons in a compact secondary group below. The layout
+mirrors in RTL. Actions wrap onto additional rows only as needed, keeping Skip and Next together
+when their pair fits on a row, and keeping trailing actions aligned to the trailing edge.
+Long labels can wrap within a button. Every action retains native button semantics and
 a minimum 48dp touch target. Nonmodal hints use the mask color behind their content for contrast
 when `surfaceColor` is transparent. Explicit surface/text colors and custom content remain supported.
-The default body size is 20sp; titles use 1.5 times that size, primary actions 1.1 times,
-secondary actions 0.9 times and progress 0.7 times.
+Empty or whitespace-only titles and body text are omitted, including Unicode spaces. Spacing is inserted only between visible
+elements, so text-only, buttons-only and single-button presentations have no placeholder gaps.
+For button labels, `null` uses the default resource string; an empty or whitespace-only label hides
+that control, as do its visibility flags. With all content, progress and controls omitted, only the
+highlight remains and no invisible content panel intercepts background taps. Text and progress
+align to the leading edge in both LTR and RTL layouts.
+The default body size is 18sp, with 32sp titles, 16sp actions and 14sp progress. These scale
+proportionally with `textSizeSp`. Content adds 16dp horizontally and 8dp vertically to `paddingDp`;
+the existing highlight padding, shape, corner radius and mask color are unaffected by this styling.
+Primary pills use an opaque version of `textColor`, with a contrasting label based on the mask tint
+(black or white when needed for contrast). Existing text appearance overrides still apply.
+Set `primaryButtonColor` to customize the Next/target-action pill independently of body text and flat
+buttons. `primaryButtonTextColor` optionally sets its label color. Both accept ARGB colors, preserving
+explicit alpha values; `null` keeps automatic defaults. When primary colors are configured, the explicit
+label color (or automatic contrast color) takes precedence over the color in `buttonTextAppearance`;
+its typography still applies. Contrast for translucent fills is estimated over the configured surface/mask.
+
+```java
+TutorialTheme theme = new TutorialTheme();
+theme.primaryButtonColor = Color.rgb(37, 99, 235);
+theme.primaryButtonTextColor = Color.WHITE; // Optional; null chooses a contrasting label.
+host.setTheme(theme); // Apply before showing the tutorial.
+```
+
 Title/content/button text appearance resources are supported. Use resource-selected colors for light/dark styling. `reducedMotion` disables transitions; system
 animation disabling is respected through
 [ValueAnimator.areAnimatorsEnabled](https://developer.android.com/reference/android/animation/ValueAnimator#areAnimatorsEnabled()).

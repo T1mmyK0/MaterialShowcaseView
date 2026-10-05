@@ -52,7 +52,7 @@ public class AndroidHostTest {
         TutorialOverlay overlay=new TutorialOverlay(root,()->target,Step.builder("a").content("Title","Body").build(),actions,theme);
         int[] shown={0};overlay.attach(()->shown[0]++);layout();idle();assertEquals(1,shown[0]);
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS,target.getImportantForAccessibility());
-        assertTrue(countButtons(overlay)>=4);overlay.cancel();overlay.cancel();
+        assertEquals(2,countButtons(overlay));overlay.cancel();overlay.cancel();
         assertEquals(View.IMPORTANT_FOR_ACCESSIBILITY_YES,target.getImportantForAccessibility());assertTrue(target.hasFocus());assertEquals(1,root.getChildCount());
     }
     int countButtons(View view) { if(view instanceof Button) {assertTrue(view.isFocusable());return 1;} int count=0;if(view instanceof ViewGroup)for(int i=0;i<((ViewGroup)view).getChildCount();i++)count+=countButtons(((ViewGroup)view).getChildAt(i));return count; }
@@ -203,7 +203,7 @@ public class AndroidHostTest {
         assertTrue(store.save(tutorial.id, 0, new ProgressStore.Progress(1, 1,
                 java.util.Collections.singleton("first"), java.util.Collections.emptySet(), ProgressStore.Outcome.ACTIVE, "second")));
         AndroidTutorialHost host = new AndroidTutorialHost(activity.getWindow(), id -> target);
-        TutorialTheme theme = new TutorialTheme(); theme.reducedMotion = true; theme.previous = "Previous";
+        TutorialTheme theme = new TutorialTheme(); theme.reducedMotion = true; theme.showPrevious = true; theme.previous = "Previous";
         host.setTheme(theme); host.setResumed(true);
         TutorialCoordinator coordinator = new TutorialCoordinator();
         TutorialSession session = new TutorialSession(tutorial, host, new MainThreadScheduler(), store,

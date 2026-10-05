@@ -2,11 +2,12 @@
     <string name="showcase_previous">Previous</string>
     <string name="showcase_next">Next</string>
     <string name="showcase_skip_step">Skip step</string>
-    <string name="showcase_skip_tour">Skip tutorial</string>
+    <string name="showcase_skip_tour">Skip</string>
     <string name="showcase_close">Close</string>
     <string name="showcase_target_action">Use highlighted control</string>
+    <string name="showcase_target_tap">Use highlighted control and continue</string>
     <plurals name="showcase_progress">
-        <item quantity="one">Step %1$d of %2$d defined step</item>
-        <item quantity="other">Step %1$d of %2$d defined steps</item>
+        <item quantity="one">%1$d of %2$d</item>
+        <item quantity="other">%1$d of %2$d</item>
     </plurals>
 </resources>

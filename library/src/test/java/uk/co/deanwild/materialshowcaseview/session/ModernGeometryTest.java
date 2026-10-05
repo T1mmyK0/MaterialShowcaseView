@@ -71,4 +71,26 @@ public class ModernGeometryTest {
         assertEquals("api-key", session.step().id); assertEquals(host.diagnostic(), TutorialSession.State.SHOWING, session.getState());
         assertTrue(outer.getScrollY() > 0); assertTrue(inner.getScrollY() > 0); assertTrue(host.valid(session.step(), true));
     }
+    @Test public void oversizedPromptShowsWithinKeyboardAndCutoutInsets() {
+        root.setPadding(12, 30, 0, 260);
+        ScrollView scroll = new ScrollView(activity); LinearLayout content = new LinearLayout(activity);
+        content.setOrientation(LinearLayout.VERTICAL); scroll.addView(content);
+        content.addView(new View(activity), new LinearLayout.LayoutParams(-1, 600));
+        TextView prompt = new TextView(activity); prompt.setText("Long prompt");
+        content.addView(prompt, new LinearLayout.LayoutParams(-1, 1800));
+        root.addView(scroll, new FrameLayout.LayoutParams(-1, -1)); layout();
+        host = new AndroidTutorialHost(root, id -> prompt); host.setResumed(true);
+        TutorialTheme theme = new TutorialTheme(); theme.reducedMotion = true; host.setTheme(theme);
+        host.setAlignment(AndroidTutorialHost.Alignment.NEAREST, 16);
+        session = new TutorialSession(new Tutorial("large-keyboard", 1,
+                Step.builder("prompt").target("prompt").content("AI prompt", "Describe your answer.").build()),
+                host, new MainThreadScheduler(), null, coordinator, TutorialCoordinator.Conflict.QUEUE);
+        session.start(); settle();
+        assertEquals(host.diagnostic(), TutorialSession.State.SHOWING, session.getState());
+        TutorialOverlay overlay = (TutorialOverlay) root.getChildAt(root.getChildCount() - 1);
+        android.graphics.Path mask = org.robolectric.util.ReflectionHelpers.getField(overlay, "mask");
+        assertTrue("Oversized target must not expose the keyboard area or remove text contrast", mask.isEmpty());
+        Rect viewport = new Rect(), bounds = new Rect(); TargetGeometry.usableOnScreen(root, viewport);
+        TargetGeometry.boundsOnScreen(overlay.getChildAt(0), bounds); assertTrue(viewport.contains(bounds));
+    }
 }

@@ -20,5 +20,7 @@ public interface TutorialHost extends Cancellation {
         void next(); void previous(); void skipStep(); void skipTour(); void close(); void actionCompleted();
         /** Host supplies the final identity/geometry check and actual target click. */
         default void activateTarget(Runnable activation) { }
+        /** Host validates and invokes the click; return true from the callback when activated. */
+        default void targetTapped(java.util.function.BooleanSupplier activation) { }
     }
 }

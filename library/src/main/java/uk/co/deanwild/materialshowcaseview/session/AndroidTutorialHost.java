@@ -42,6 +42,8 @@ public final class AndroidTutorialHost implements TutorialHost {
     /** Opt in when preparation expands/enables/attaches a presently unavailable target. */
     public void setPrepareUnavailableTargets(boolean value) { scheduler.checkThread(); prepareUnavailableTargets = value; }
     public void setRevealStrategy(RevealStrategy value) { scheduler.checkThread(); reveal = Objects.requireNonNull(value); }
+    /** Scroll alignment and margin inside the usable viewport, in pixels (negative margins become zero).
+     * The app's scroll range must provide room for the margin, including padding after its last item. */
     public void setAlignment(Alignment value, int paddingPixels) { scheduler.checkThread(); alignment = Objects.requireNonNull(value); padding = Math.max(0, paddingPixels); }
     public void setTheme(TutorialTheme value) { scheduler.checkThread(); theme = Objects.requireNonNull(value); }
     public void invalidate() { scheduler.checkThread(); changed(); }

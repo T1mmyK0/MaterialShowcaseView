@@ -12,7 +12,8 @@ public final class TargetValidator {
         return diagnose(target, host, step, visible) == Reason.READY;
     }
     public static Reason diagnose(View target, View host, Step step, boolean visible) {
-        return diagnose(target, host, visible, step.enabledRequired, step.clickableRequired);
+        boolean targetTap = step.interaction == Step.Interaction.TARGET_TAP;
+        return diagnose(target, host, visible, step.enabledRequired || targetTap, step.clickableRequired || targetTap);
     }
     static Reason diagnoseHighlight(View target, View host, boolean visible) {
         return diagnose(target, host, visible, false, false);
@@ -45,9 +46,14 @@ public final class TargetValidator {
         if (!shown.intersect(viewport)) return Reason.CLIPPED;
         Rect transformed = new Rect(); TargetGeometry.boundsOnScreen(target, transformed);
         if (transformed.isEmpty()) return Reason.ZERO_SIZE;
-        // An oversized target is ready when its visible region fills the usable viewport.
-        // Permit one pixel of rounding when Android rounds a fractional transformed edge.
-        return shown.width() + 1 >= Math.min(transformed.width(), viewport.width())
-                && shown.height() + 1 >= Math.min(transformed.height(), viewport.height()) ? Reason.READY : Reason.CLIPPED;
+        return enoughVisible(shown.width(), transformed.width(), viewport.width())
+                && enoughVisible(shown.height(), transformed.height(), viewport.height()) ? Reason.READY : Reason.CLIPPED;
+    }
+    private static boolean enoughVisible(int shown, int target, int viewport) {
+        // A target that cannot fit only needs half the usable extent on that axis.
+        // Requiring every pixel rejects the padding deliberately left by reveal strategies.
+        // Ordinary targets still need a full fit; a sliver of an oversized target is not ready.
+        int required = target > viewport ? (viewport + 1) / 2 : target;
+        return shown + 1 >= required; // Allow transformed-edge rounding by Android.
     }
 }

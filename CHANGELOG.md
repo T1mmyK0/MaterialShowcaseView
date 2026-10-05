@@ -1,5 +1,28 @@
 # Unreleased — lifecycle-aware onboarding
 
+- Prevented reentrant target activations from invoking app actions more than once. Target gestures
+  now respect the actual custom highlight shape; custom path resets/fill rules preserve other highlights.
+- Added `Step.Interaction.TARGET_TAP` for continuation only from the primary highlighted target,
+  invoking its app click handler before advancing. Keyboard/accessibility activation stays at the highlight,
+  oversized targets retain a tappable portion, and background/Next/Skip step cannot bypass the tap.
+- Added independent primary-button fill and label colors, preserving the existing defaults and explicit
+  color alpha. Documented scroll margins through `setAlignment`, including dp conversion and scroll-range limits.
+- Fixed oversized targets waiting despite being visible after padded scrolling. Oversized axes now
+  accept half the usable viewport while ordinary targets retain full-visibility validation.
+  Suppressed highlight holes when they leave insufficient room for tutorial controls, preserving mask transparency;
+  the normal highlight returns when space becomes available.
+- Applied the selected Refined Spotlight text and button design to session overlays: medium-weight
+  headings, softer body copy, compact progress and Skip beside a trailing Next pill.
+  Optional Previous leads the main row; optional Skip step and Close sit below. Skip and Next
+  stay together when their pair fits, including in RTL. Preserved existing highlight geometry, mask colors,
+  navigation actions and custom text appearances.
+- Fixed text-action hover and focus backgrounds with balanced label padding and rounded rectangle
+  feedback, preserving the leading text alignment and the primary action's pill shape.
+- Made optional content collapse cleanly: no placeholder gaps for missing copy, no blank controls
+  for empty labels, and no invisible panel on highlight-only steps. Optional actions wrap into
+  compact rows; long labels, large text and RTL keep all controls reachable.
+- Fixed keyboard and accessibility continuation on background-tap steps, guarded direct clicks
+  against stale presentations, and treated Unicode whitespace as empty copy/button labels.
 - Restored the session overlay's original showcase styling: blue translucent mask, white text,
   transparent content surface and flat actions instead of a white panel with raised system buttons.
   Explanations sit beside the highlight; action rows stack for narrow windows or large text.
