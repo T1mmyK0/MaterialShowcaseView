@@ -72,10 +72,49 @@ public class LayoutContractMatrixTest {
                     overlay.attach(() -> { }); settle();
                     ScrollView panel = (ScrollView) overlay.getChildAt(0);
                     LinearLayout content = (LinearLayout) panel.getChildAt(0);
-                    View close = content.getChildAt(content.getChildCount() - 1);
+                    View close = findButton(content, "Close");
+                    assertNotNull(close);
                     assertReachable(panel, close); close.performClick(); assertEquals(1, closed[0]);
                 } finally { overlay.cancel(); }
             }
+    }
+    private Button findButton(View view, String label) {
+        if (view instanceof Button && label.contentEquals(((Button) view).getText())) return (Button) view;
+        if (view instanceof ViewGroup) for (int i = 0; i < ((ViewGroup) view).getChildCount(); i++) {
+            Button found = findButton(((ViewGroup) view).getChildAt(i), label);
+            if (found != null) return found;
+        }
+        return null;
+    }
+    @Test public void longNavigationLabelsRemainFullyReachableAndActivateInNarrowRtlWindow() {
+        configure(240, 320, true, 2);
+        TutorialTheme theme = new TutorialTheme(); theme.reducedMotion = true; theme.showSkipStep = true;
+        String[] labels = {"Return to the previous tutorial step", "Continue to the next tutorial step",
+                "Skip this tutorial step", "Skip the entire tutorial", "Close this tutorial"};
+        theme.previous = labels[0]; theme.next = labels[1]; theme.skipStep = labels[2];
+        theme.skipTour = labels[3]; theme.close = labels[4];
+        int[] clicks = new int[5];
+        TutorialHost.Actions actions = new TutorialHost.Actions() {
+            public void previous() { clicks[0]++; } public void next() { clicks[1]++; }
+            public void skipStep() { clicks[2]++; } public void skipTour() { clicks[3]++; }
+            public void close() { clicks[4]++; } public void actionCompleted() { }
+        };
+        TutorialOverlay overlay = new TutorialOverlay(root, () -> target,
+                Step.builder("actions").content("Title", "Body").build(), actions, theme);
+        try {
+            overlay.attach(() -> { }); settle();
+            ScrollView panel = (ScrollView) overlay.getChildAt(0);
+            for (int i = 0; i < labels.length; i++) {
+                Button button = findButton(panel, labels[i]); assertNotNull(button);
+                assertTrue(button.isFocusable()); assertTrue(button.getHeight() >= 48);
+                Rect bounds = new Rect(); button.getDrawingRect(bounds);
+                panel.offsetDescendantRectToMyCoords(button, bounds);
+                assertTrue("Action clips horizontally: " + labels[i], bounds.left >= 0 && bounds.right <= panel.getWidth());
+                button.requestRectangleOnScreen(new Rect(0, 0, button.getWidth(), Math.min(48, button.getHeight())), true);
+                Rect visible = new Rect(); assertTrue(button.getGlobalVisibleRect(visible));
+                button.performClick(); assertEquals(1, clicks[i]);
+            }
+        } finally { overlay.cancel(); }
     }
     @Test public void legacyControlsRemainReachableAcrossWindowDirectionAndFontMatrix() {
         for (int[] size : new int[][]{{320, 480}, {480, 320}, {240, 320}})

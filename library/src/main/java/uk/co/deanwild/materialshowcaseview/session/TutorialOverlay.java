@@ -2,8 +2,11 @@ package uk.co.deanwild.materialshowcaseview.session;
 
 import android.animation.*;
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.graphics.*;
+import android.graphics.drawable.RippleDrawable;
 import android.os.Build;
+import android.text.TextUtils;
 import android.view.*;
 import android.widget.*;
 import java.util.*;
@@ -50,36 +53,95 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         previousFocus = root.findFocus();
         previousAccessibilityFocus = accessibilityFocus(root);
         setWillNotDraw(false); setFocusable(true);
-        panel = new ScrollView(getContext()); panel.setFillViewport(false); panel.setBackgroundColor(theme.surfaceColor);
+        panel = new ScrollView(getContext()); panel.setFillViewport(false);
+        // Hints have no scrim behind them, so give their text the same contrast locally.
+        panel.setBackgroundColor(step.interaction == Step.Interaction.HINT
+                && Color.alpha(theme.surfaceColor) == 0 ? theme.maskColor : theme.surfaceColor);
         LinearLayout content = new LinearLayout(getContext()); content.setOrientation(LinearLayout.VERTICAL);
         int padding = dp(theme.paddingDp); content.setPadding(padding, padding, padding, padding);
         panel.addView(content, new ScrollView.LayoutParams(-1, -2));
-        progress = text(""); progress.setVisibility(GONE); content.addView(progress);
+        progress = text(""); progress.setTextSize(theme.textSizeSp * .7f);
+        progress.setPaddingRelative(dp(5), 0, dp(5), dp(10));
+        progress.setVisibility(GONE); content.addView(progress);
         if (theme.contentFactory != null) content.addView(theme.contentFactory.create(getContext(), step));
         else {
-            TextView title = text(step.title); title.setTypeface(null, Typeface.BOLD);
-            if(theme.titleTextAppearance!=0)title.setTextAppearance(getContext(),theme.titleTextAppearance);content.addView(title);
-            content.addView(text(step.text));
+            TextView title = text(step.title); title.setTextSize(theme.textSizeSp * 1.5f);
+            title.setPaddingRelative(dp(5), 0, dp(5), dp(15));
+            title.setVisibility(TextUtils.isEmpty(step.title) ? GONE : VISIBLE);
+            if (theme.titleTextAppearance != 0) title.setTextAppearance(getContext(), theme.titleTextAppearance);
+            content.addView(title);
+            TextView body = text(step.text); body.setPaddingRelative(dp(5), 0, dp(5), 0);
+            body.setVisibility(TextUtils.isEmpty(step.text) ? GONE : VISIBLE);
+            if (!TextUtils.isEmpty(step.title)) body.setAlpha(.5f);
+            content.addView(body);
         }
-        if (theme.showPrevious) button(content, theme.previous, R.string.showcase_previous, () -> navigate(theme.previousAction));
+        ActionRow navigation = new ActionRow(getContext());
+        if (theme.showPrevious) button(navigation, theme.previous, R.string.showcase_previous, true, () -> navigate(theme.previousAction));
         if (theme.showNext && step.interaction != Step.Interaction.APPLICATION_ACTION && step.interaction != Step.Interaction.TARGET_ACTION)
-            button(content, theme.next, R.string.showcase_next, () -> navigate(theme.nextAction));
+            button(navigation, theme.next, R.string.showcase_next, true, () -> navigate(theme.nextAction));
         if (step.interaction == Step.Interaction.TARGET_ACTION)
-            button(content, null, R.string.showcase_target_action, () -> activateTarget(null, null, null));
-        if (theme.showSkipStep) button(content, theme.skipStep, R.string.showcase_skip_step, () -> navigate(theme.skipStepAction));
-        if (theme.showSkipTour) button(content, theme.skipTour, R.string.showcase_skip_tour, () -> navigate(theme.skipTourAction));
-        if (theme.showClose) button(content, theme.close, R.string.showcase_close, () -> navigate(theme.closeAction));
+            button(navigation, null, R.string.showcase_target_action, true, () -> activateTarget(null, null, null));
+        addActions(content, navigation, 20);
+        ActionRow secondary = new ActionRow(getContext());
+        if (theme.showSkipStep) button(secondary, theme.skipStep, R.string.showcase_skip_step, false, () -> navigate(theme.skipStepAction));
+        if (theme.showSkipTour) button(secondary, theme.skipTour, R.string.showcase_skip_tour, false, () -> navigate(theme.skipTourAction));
+        if (theme.showClose) button(secondary, theme.close, R.string.showcase_close, false, () -> navigate(theme.closeAction));
+        addActions(content, secondary, 10);
         addView(panel, new LayoutParams(-1, -2, Gravity.BOTTOM));
     }
     private TextView text(CharSequence text) {
         TextView view = new TextView(getContext()); view.setText(text); view.setTextColor(theme.textColor); view.setTextSize(theme.textSizeSp);
+        view.setTypeface(Typeface.DEFAULT, Typeface.NORMAL);
         if(theme.contentTextAppearance!=0)view.setTextAppearance(getContext(),theme.contentTextAppearance);
         view.setFocusable(true); return view;
     }
-    private void button(LinearLayout content, CharSequence label, int resource, Runnable action) {
+    private void button(LinearLayout content, CharSequence label, int resource, boolean primary, Runnable action) {
         Button button = new Button(getContext()); button.setAllCaps(false); button.setText(label == null ? getContext().getString(resource) : label);
-        button.setMinHeight(dp(48)); button.setTextColor(theme.textColor); button.setOnClickListener(v -> callbacks.run(() -> { if (!closed && !exiting) action.run(); })); content.addView(button);
+        // Retain native button semantics, without inheriting raised platform/host styling.
+        button.setBackgroundTintList(null);
+        int ripple = (theme.textColor & 0x00ffffff) | 0x33000000;
+        button.setBackground(new RippleDrawable(ColorStateList.valueOf(ripple), null,
+                new android.graphics.drawable.ColorDrawable(Color.WHITE)));
+        button.setStateListAnimator(null); button.setElevation(0);
+        button.setMinWidth(dp(48)); button.setMinimumWidth(dp(48));
+        button.setMinHeight(dp(48)); button.setMinimumHeight(dp(48));
+        button.setPaddingRelative(dp(5), dp(10), dp(5), dp(10));
+        button.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
+        button.setTypeface(Typeface.DEFAULT, Typeface.NORMAL); button.setLetterSpacing(0);
+        button.setTextSize(theme.textSizeSp * (primary ? 1.1f : .9f));
+        button.setTextColor(theme.textColor);
+        button.setOnClickListener(v -> callbacks.run(() -> { if (!closed && !exiting) action.run(); }));
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-2, -2);
+        if (content.getChildCount() > 0) params.setMarginStart(dp(16));
+        content.addView(button, params);
         if(theme.buttonTextAppearance!=0)button.setTextAppearance(getContext(),theme.buttonTextAppearance);
+    }
+    private void addActions(LinearLayout content, ActionRow row, int topMargin) {
+        if (row.getChildCount() == 0) return;
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(-1, -2);
+        params.topMargin = dp(topMargin); content.addView(row, params);
+    }
+    /** Keep actions compact, but let large fonts/translated labels use the scrollable column. */
+    private static final class ActionRow extends LinearLayout {
+        ActionRow(Context context) { super(context); }
+        @Override protected void onMeasure(int widthSpec, int heightSpec) {
+            int naturalWidth = 0;
+            int gap = Math.round(16 * getResources().getDisplayMetrics().density);
+            for (int i = 0; i < getChildCount(); i++) {
+                View child = getChildAt(i);
+                child.measure(MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                        MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+                naturalWidth += child.getMeasuredWidth() + (i == 0 ? 0 : gap);
+            }
+            boolean stack = MeasureSpec.getMode(widthSpec) != MeasureSpec.UNSPECIFIED
+                    && naturalWidth > MeasureSpec.getSize(widthSpec) - getPaddingLeft() - getPaddingRight();
+            setOrientation(stack ? VERTICAL : HORIZONTAL);
+            for (int i = 0; i < getChildCount(); i++) {
+                LinearLayout.LayoutParams params = (LinearLayout.LayoutParams) getChildAt(i).getLayoutParams();
+                params.setMarginStart(stack || i == 0 ? 0 : gap);
+            }
+            super.onMeasure(widthSpec, heightSpec);
+        }
     }
     private void navigate(TutorialTheme.Navigation action) {
         if(action==null)return;
@@ -162,6 +224,11 @@ final class TutorialOverlay extends FrameLayout implements Cancellation {
         LayoutParams lp = (LayoutParams) panel.getLayoutParams();
         int height = Math.min(space, panel.getMeasuredHeight());
         int y = top ? viewport.top : viewport.bottom - height;
+        if (!beside && !highlightBounds.isEmpty()) {
+            // Match the legacy showcase: keep its explanation next to the highlighted control.
+            y = top ? (int) Math.floor(highlightBounds.top) - height : (int) Math.ceil(highlightBounds.bottom);
+            y = Math.max(viewport.top, Math.min(y, viewport.bottom - height));
+        }
         int x = beside && right > left ? viewport.right - cardWidth : viewport.left;
         if (lp.width != cardWidth || lp.height != height || lp.topMargin != y || lp.leftMargin != x) {
             lp.gravity = Gravity.TOP | Gravity.LEFT; lp.width = Math.max(0, cardWidth); lp.height = height;

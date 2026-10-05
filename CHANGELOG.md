@@ -1,5 +1,9 @@
 # Unreleased — lifecycle-aware onboarding
 
+- Restored the session overlay's original showcase styling: blue translucent mask, white text,
+  transparent content surface and flat actions instead of a white panel with raised system buttons.
+  Explanations sit beside the highlight; action rows stack for narrow windows or large text.
+  Lifecycle behavior, custom theme overrides, scrolling and accessible navigation are retained.
 - **Breaking platform requirement:** raised the core, optional lifecycle adapter and sample
   to Android 7.0 (API 24). Consumers must also use minSdk 24 or newer.
 - Removed pre-24 animation, accessibility, clipping and inset compatibility branches; retained

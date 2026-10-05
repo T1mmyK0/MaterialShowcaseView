@@ -244,7 +244,15 @@ require valid attachment, visibility and geometry.
 Overlapping regions combine into one cutout. Legacy custom shapes remain available in MaterialShowcaseView.
 
 `TutorialTheme` controls colors, text size, spacing, navigation labels and animation duration;
-title/content/button text appearance resources are supported. Use resource-selected colors for light/dark styling. `reducedMotion` disables transitions; system
+the default modal presentation preserves the original showcase's blue translucent mask,
+transparent content background, regular white title/body text and flat text actions. Explanations
+sit next to the highlighted target. Navigation and secondary actions use compact rows that stack
+when the available width cannot fit their labels; every action retains native button semantics and
+a minimum 48dp touch target. Nonmodal hints use the mask color behind their content for contrast
+when `surfaceColor` is transparent. Explicit surface/text colors and custom content remain supported.
+The default body size is 20sp; titles use 1.5 times that size, primary actions 1.1 times,
+secondary actions 0.9 times and progress 0.7 times.
+Title/content/button text appearance resources are supported. Use resource-selected colors for light/dark styling. `reducedMotion` disables transitions; system
 animation disabling is respected through
 [ValueAnimator.areAnimatorsEnabled](https://developer.android.com/reference/android/animation/ValueAnimator#areAnimatorsEnabled()).
 `contentFactory` creates a fresh custom View for each presentation; navigation remains library-owned.

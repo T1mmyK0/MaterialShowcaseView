@@ -3,11 +3,14 @@ package uk.co.deanwild.materialshowcaseview.session;
 import android.graphics.Color;
 import android.view.View;
 import android.content.Context;
+import uk.co.deanwild.materialshowcaseview.ShowcaseConfig;
 
 /** Copied by each presentation. Labels may be loaded from application resources. Dimensions are dp/sp. */
 public final class TutorialTheme {
-    public int maskColor = 0xCC000000, surfaceColor = Color.WHITE, textColor = Color.BLACK;
-    public float textSizeSp = 18, paddingDp = 16, cornerDp = 12;
+    // Keep the original showcase palette; lifecycle support does not imply a new design.
+    public int maskColor = Color.parseColor(ShowcaseConfig.DEFAULT_MASK_COLOUR);
+    public int surfaceColor = Color.TRANSPARENT, textColor = Color.WHITE;
+    public float textSizeSp = 20, paddingDp = 16, cornerDp = 12;
     public long animationMillis = 180;
     public boolean reducedMotion, showPrevious = true, showNext = true, showSkipStep, showSkipTour = true, showClose = true;
     public boolean showProgress = true;
